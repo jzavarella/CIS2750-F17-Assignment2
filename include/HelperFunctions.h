@@ -1,3 +1,9 @@
+// Print function for event list
+char* printEventListFunction(void *toBePrinted);
+// Compare function for event list
+int compareEventListFunction(const void *first, const void *second);
+// Delete function for event list
+void deleteEventListFunction(void *toBeDeleted);
 // Print function for property list
 char* printPropertyListFunction(void *toBePrinted);
 // Compare function for property list

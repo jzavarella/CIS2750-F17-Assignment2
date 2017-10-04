@@ -14,7 +14,7 @@
 #include <stdbool.h>
 
 /**
- * Node of a linked list. This list is doubly linked, meaning that it has points to both the node immediately in front 
+ * Node of a linked list. This list is doubly linked, meaning that it has points to both the node immediately in front
  * of it, as well as the node immediately behind it.
  **/
 typedef struct listNode{
@@ -24,7 +24,7 @@ typedef struct listNode{
 } Node;
 
 /**
- * Metadata head of the list. 
+ * Metadata head of the list.
  * Contains no actual data but contains
  * information about the list (head and tail) as well as the function pointers
  * for working with the abstracted list data.
@@ -59,7 +59,7 @@ List initializeList(char* (*printFunction)(void* toBePrinted),void (*deleteFunct
 
 
 
-/**Function for creating a node for the linked list. 
+/**Function for creating a node for the linked list.
 * This node contains abstracted (void *) data as well as previous and next
 * pointers to connect to other nodes in the list
 *@pre data should be of same size of void pointer on the users machine to avoid size conflicts. data must be valid.
@@ -82,7 +82,7 @@ void insertFront(List* list, void* toBeAdded);
 
 
 
-/**Inserts a Node at the back of a linked list. 
+/**Inserts a Node at the back of a linked list.
 *List metadata is updated so that head and tail pointers are correct.
 *@pre 'List' type must exist and be used in order to keep track of the linked list.
 *@param list pointer to the dummy head of the list
@@ -100,12 +100,12 @@ void insertBack(List* list, void* toBeAdded);
 void clearList(List* list);
 
 
-/** Uses the comparison function pointer to place the element in the 
+/** Uses the comparison function pointer to place the element in the
 * appropriate position in the list.
-* should be used as the only insert function if a sorted list is required.  
+* should be used as the only insert function if a sorted list is required.
 *@pre List exists and has memory allocated to it. Node to be added is valid.
 *@post The node to be added will be placed immediately before or after the first occurrence of a related node
-*@param list a pointer to the dummy head of the list containing function pointers for delete and compare, as well 
+*@param list a pointer to the dummy head of the list containing function pointers for delete and compare, as well
 as a pointer to the first and last element of the list.
 *@param toBeAdded a pointer to data that is to be added to the linked list
 **/
@@ -115,7 +115,7 @@ void insertSorted(List* list, void* toBeAdded);
 
 /** Removes data from from the list, deletes the node and frees the memory,
  * changes pointer values of surrounding nodes to maintain list structure.
- * returns the data 
+ * returns the data
  * You can assume that the list contains no duplicates
  *@pre List must exist and have memory allocated to it
  *@post toBeDeleted will have its memory freed if it exists in the list.
@@ -155,7 +155,7 @@ returned string must be freed by the calling function.
 char* toString(List list);
 
 
-/** Function for creating an iterator for the linked list. 
+/** Function for creating an iterator for the linked list.
  * This node contains abstracted (void *) data as well as previous and next
  * pointers to connect to other nodes in the list
  *@pre List exists and is valid
@@ -166,7 +166,7 @@ char* toString(List list);
 ListIterator createIterator(List list);
 
 
-/** Function that returns the next element of the list through the iterator. 
+/** Function that returns the next element of the list through the iterator.
 * This function returns the data at head of the list the first time it is called after.
 * the iterator was created. Every subsequent call returns the data associated with the next element.
 * Returns NULL once the end of the iterator is reached.
@@ -193,6 +193,6 @@ int getLength(List list);
  *@param list - a list sruct
  *@param compare - a pointer to comparator fuction for customizing the search
  **/
-void* findElement(List list, int (*compare)(const void* first,const void* second));
+void* findElement(List list, int (*compare)(const void* first,const void* second), const void* search);
 
 #endif

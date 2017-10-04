@@ -23,7 +23,7 @@
 *@param compareFunction function pointer to compare two nodes of the list in order to test for equality or order
 **/
 List initializeList(char* (*printFunction)(void *toBePrinted),void (*deleteFunction)(void *toBeDeleted),int (*compareFunction)(const void *first,const void *second)) {
-  return (List) { .deleteData = deleteFunction, .compare = compareFunction, .printData = printFunction };
+  return (List) { .deleteData = deleteFunction, .compare = compareFunction, .printData = printFunction, .length = 0 };
 }
 
 /**Function for creating a node for the linked list.
@@ -35,7 +35,7 @@ List initializeList(char* (*printFunction)(void *toBePrinted),void (*deleteFunct
 *@return On success returns a node that can be added to a linked list. On failure, returns NULL.
 *@param data - is a void * pointer to any data type.  Data must be allocated on the heap.
 **/
-Node *initializeNode(void *data) {
+Node* initializeNode(void *data) {
   if (sizeof(void*) != sizeof(data)) {
     return NULL; // Data should be the same size as void pointer to avoid size conflicts
   }
@@ -78,6 +78,7 @@ void insertFront(List *list, void *toBeAdded) {
   if (!(list->tail)) {
     list->tail = newNode;
   }
+  list->length ++;
 }
 
 /**Inserts a Node at the back of a linked list.
@@ -106,6 +107,7 @@ void insertBack(List *list, void *toBeAdded) {
   if (!(list->head)) {
     list->head = newNode;
   }
+  list->length ++;
 }
 
 /**Returns a pointer to the data at the front of the list. Does not alter list structure.
@@ -188,6 +190,7 @@ void insertSorted(List *list, void *toBeAdded) {
     } else if (!nextNode) {
       // If the next node is NULL then we have reached the end of the list and can insert toBeAdded at the end of the list
       insertBack(list, toBeAdded);
+      list->length ++;
     }
 
     currentNode = nextNode; //Move to the next node
@@ -226,6 +229,7 @@ void* deleteDataFromList(List *list, void *toBeDeleted) {
       }
       free(currentNode); // Free this node
       return data; // Return pointer to data
+      list->length --;
     }
     currentNode = nextNode; //Move to the next node
   }
@@ -312,10 +316,26 @@ void* nextElement(ListIterator* iter) {
  *@return on success: number of eleemnts in the list (0 or more).  on failure: -1 (e.g. list not initlized correctly)
  **/
 int getLength(List list) {
+  return list.length;
+}
+
+/** Function that searches for an element in the list using a comparator function.
+ * If an element is found, a pointer to the data of that element is returned
+ * Returns NULL if the element is not found.
+ *@pre List exists and is valid.  Comparator function has been provided.
+ *@post List remains unchanged.
+ *@return The data associated with the list element that matches the search criteria.  If element is not found, return NULL.
+ *@param list - a list sruct
+ *@param compare - a pointer to comparator fuction for customizing the search
+ **/
+void* findElement(List list, int (*compare)(const void* first,const void* second), const void* search) {
   ListIterator iter = createIterator(list);
-  int count = 0;
-  while (nextElement(&iter)) { // Iterate over the list
-    count ++; // Increment
+  void* element;
+  while ((element = nextElement(&iter))) { // Iterate over the list
+
+    if (compare(search, element)) { // Compare the data
+      return element; // If they match return the data
+    }
   }
-  return count; // Return the value
+  return NULL; // No match
 }

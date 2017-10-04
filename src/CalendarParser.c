@@ -1,6 +1,6 @@
 /*
  * CIS2750 F2017
- * Assignment 1
+ * Assignment 2
  * Jackson Zavarella 0929350
  * This file parses iCalendar Files
  * No code was used from previous classes/ sources
@@ -29,10 +29,10 @@
 **/
 ErrorCode createCalendar(char* fileName, Calendar** obj) {
   Calendar* calendar = *obj;
-  strcpy(calendar->prodID, ""); // Ensure that this field is not blank to prevent uninitialized conditinoal jump errors in valgrind
+  strcpy(calendar->prodID, ""); // Ensure that this field is not blank to prevent uninitialized conditional jump errors in valgrind
 
-  Event* event = newEmptyEvent(); // Create an empty event
-  calendar->event = event; // Assign the empty event
+  List events = initializeList(&printEventListFunction, &deleteEventListFunction, &compareEventListFunction);
+  calendar->events = events; // Assign the empty event list
 
   List iCalPropertyList = initializeList(&printPropertyListFunction, &deletePropertyListFunction, &comparePropertyListFunction); // Create a list to store all properties/ lines
   ErrorCode lineCheckError = readLinesIntoList(fileName, &iCalPropertyList, 512); // Read the lines of the file into a list of properties
@@ -53,34 +53,47 @@ ErrorCode createCalendar(char* fileName, Calendar** obj) {
 
   // List to store event properties
   List betweenVEventTags = initializeList(&printPropertyListFunction, &deletePropertyListFunction, &comparePropertyListFunction);
-  // Extract all properties between event tags
-  ErrorCode betweenVEventTagsError = extractBetweenTags(betweenVCalendarTags, &betweenVEventTags, INV_EVENT, "VEVENT");
+
+  ErrorCode eventTagsError;
+  // While we still have VALARM tags
+  while ((eventTagsError = extractBetweenTags(betweenVCalendarTags, &betweenVEventTags, INV_EVENT, "VEVENT")) != INV_EVENT) {
+    // If there is an event, check the event error
+    if (eventTagsError != OK) {
+      clearList(&iCalPropertyList); // Clear lists before returning
+      clearList(&events);
+      clearList(&betweenVCalendarTags);
+      clearList(&betweenVEventTags);
+      return eventTagsError; // Return the error that was produced
+    }
+    Event* event = newEmptyEvent();
+
+    ErrorCode eventError = createEvent(betweenVEventTags, event); // Create and event given the event properties that were extracted
+    if (eventError != OK) { // If there was a problem
+      clearList(&iCalPropertyList); // Clear list before returning
+      clearList(&events);
+      clearList(&betweenVCalendarTags);
+      clearList(&betweenVEventTags);
+      events.deleteData(event); // Remove the event
+      return eventError; // Return the error that was produced
+    }
+
+    insertBack(&events, event); // Put her in
+
+    removeIntersectionOfLists(&betweenVCalendarTags, betweenVEventTags);
+    deleteProperty(&betweenVCalendarTags, "BEGIN:VEVENT"); // Remove the begin tag
+    deleteProperty(&betweenVCalendarTags, "END:VEVENT"); // Remove the begin tag
+    clearList(&betweenVEventTags);
+
+  }
+
   // Check to see if there is an event at all
-  if (!betweenVEventTags.head || !betweenVEventTags.tail) {
+  if (!events.head) {
     clearList(&iCalPropertyList); // Clear lists before returning
     clearList(&betweenVCalendarTags);
     clearList(&betweenVEventTags);
+    clearList(&events);
     return INV_CAL; // If there is no event, then the calendar is invalid
   }
-  // If there is an event, check the event error
-  if (betweenVEventTagsError != OK) {
-    clearList(&iCalPropertyList); // Clear lists before returning
-    clearList(&betweenVCalendarTags);
-    clearList(&betweenVEventTags);
-    return betweenVEventTagsError; // Return the error that was produced
-  }
-
-  ErrorCode eventError = createEvent(betweenVEventTags, event); // Create and event given the event properties that were extracted
-  if (eventError != OK) { // If there was a problem
-    clearList(&iCalPropertyList); // Clear list before returning
-    clearList(&betweenVCalendarTags);
-    clearList(&betweenVEventTags);
-    return eventError; // Return the error that was produced
-  }
-
-  removeIntersectionOfLists(&betweenVCalendarTags, betweenVEventTags); // Remove the event properties from the calendar tags
-  deleteProperty(&betweenVCalendarTags, "BEGIN:VEVENT"); // Remove the begin tag
-  deleteProperty(&betweenVCalendarTags, "END:VEVENT"); // Remove the begin tag
 
   // // We should only have VERSION and PRODID now
   ErrorCode iCalIdErrors = parseRequirediCalTags(&betweenVCalendarTags, *obj); // Place UID and version in the obj
@@ -88,13 +101,14 @@ ErrorCode createCalendar(char* fileName, Calendar** obj) {
     clearList(&iCalPropertyList); // Clear lists before returning
     clearList(&betweenVCalendarTags);
     clearList(&betweenVEventTags);
+    clearList(&events);
     return iCalIdErrors; // Return the error that was produced
   }
-
 
   clearList(&iCalPropertyList); // Clear lists before returning
   clearList(&betweenVCalendarTags);
   clearList(&betweenVEventTags);
+  calendar->events = events; // Assign the empty event list
   return OK; // Congratulations you parsed the file. Return OK
 }
 
@@ -108,19 +122,8 @@ void deleteCalendar(Calendar* obj) {
   if (!obj) {
     return; // No need to be freed if the object is NULL
   }
-
-  Event* event = obj->event;
-  if (event != NULL) { // If there is an event
-    List* props = &event->properties; // Grab the props
-    if (props) { // If there are props
-      clearList(props); // Set them free
-    }
-    List* alarms = &event->alarms; // Grab the alarms
-    if (alarms) { // If the alarms exist
-      clearList(alarms); // Set them free
-    }
-    free(event); // Set it free
-  }
+  List events = obj->events;
+  clearList(&events);
 
   free(obj); // Free object? I Like free objects
 }
@@ -160,8 +163,11 @@ char* printCalendar(const Calendar* obj) {
 
   stringSize += 1; // newline
 
-  if (obj->event) {
-    Event* event = obj->event;
+  List events = obj->events;
+  ListIterator eventIter = createIterator(events);
+  Event* event;
+
+  while ((event = nextElement(&eventIter))) {
     calculateLineLength(&lineLength, " CALENDAR EVENT: \n" , NULL); // Add the length of these strings to the lineLength
     updateLongestLineAndIncrementStringSize(&longestLine, &lineLength, &stringSize); // Update the variable that stores the line with the greatest length
 
@@ -260,9 +266,10 @@ char* printCalendar(const Calendar* obj) {
   concatenateLine(string, " VERSION: ", vString, "\n", NULL);
   // newline
   concatenateLine(string, "\n", NULL);
-  // CALENDAR EVENT:\n
-  if (obj->event) {
-    Event* event = obj->event;
+
+  eventIter = createIterator(events);
+
+  while ((event = nextElement(&eventIter))) {
     concatenateLine(string, " CALENDAR EVENT: \n", NULL);
     // UID: some uid\n
     concatenateLine(string, "   UID: ", event->UID, "\n", NULL);
@@ -327,7 +334,7 @@ char* printCalendar(const Calendar* obj) {
           the descr array using rhe error code enum value as an index
  *@param err - an error code
 **/
-char* printError(ErrorCode err) {
+const char* printError(ErrorCode err) {
   char* error;
   switch (err) {
     case OK: // OK
@@ -411,6 +418,159 @@ void safelyFreeString(char* c) {
   }
 }
 
+void deleteEventListFunction(void* toBeDeleted) {
+  Event* event = (Event*) toBeDeleted;
+  if (event != NULL) { // If there is an event
+    List* props = &event->properties; // Grab the props
+    if (props) { // If there are props
+      clearList(props); // Set them free
+    }
+    List* alarms = &event->alarms; // Grab the alarms
+    if (alarms) { // If the alarms exist
+      clearList(alarms); // Set them free
+    }
+    free(event); // Set it free
+  }
+}
+
+char* printEventListFunction(void *toBePrinted) {
+  size_t longestLine = 0;
+  size_t lineLength = 0;
+  size_t stringSize = 0;
+  Event* event = (Event*) toBePrinted;
+
+  calculateLineLength(&lineLength, " CALENDAR EVENT: \n" , NULL); // Add the length of these strings to the lineLength
+  updateLongestLineAndIncrementStringSize(&longestLine, &lineLength, &stringSize); // Update the variable that stores the line with the greatest length
+
+  // UID: some uid\n
+  if (strlen(event->UID) == 0) {
+    return NULL;
+  }
+
+  calculateLineLength(&lineLength, "  UID: ", event->UID, "\n" , NULL); // Add the length of these strings to the lineLength
+  updateLongestLineAndIncrementStringSize(&longestLine, &lineLength, &stringSize); // Update the variable that stores the line with the greatest length
+
+  // CREATION TIMESTAMP: some time\n
+  char* dtString = printDatePretty(event->creationDateTime);
+  calculateLineLength(&lineLength, "  CREATION TIMESTAMP: ", dtString, "\n" , NULL); // Add the length of these strings to the lineLength
+  safelyFreeString(dtString);
+  updateLongestLineAndIncrementStringSize(&longestLine, &lineLength, &stringSize); // Update the variable that stores the line with the greatest length
+
+  List alarms = event->alarms;
+  if (alarms.head) {
+    ListIterator alarmIterator = createIterator(alarms);
+
+    Alarm* a;
+    while ((a = nextElement(&alarmIterator)) != NULL) { // Loop through each alarm
+      calculateLineLength(&lineLength, "  ALARM: \n" , NULL); // Add the length of these strings to the lineLength
+      updateLongestLineAndIncrementStringSize(&longestLine, &lineLength, &stringSize); // Update the variable that stores the line with the greatest length
+
+      if (strlen(a->action) == 0) {
+        return NULL; // Action is empty return null
+      }
+      // Get the length of the Action line
+      calculateLineLength(&lineLength, "    ACTION: ", a->action, "\n" , NULL); // Add the length of these strings to the lineLength
+      updateLongestLineAndIncrementStringSize(&longestLine, &lineLength, &stringSize); // Update the variable that stores the line with the greatest length
+
+      if (strlen(a->trigger) == 0) {
+        return NULL; // Action is empty return null
+      }
+      // Get the length of the Trigger line
+      calculateLineLength(&lineLength, "    TRIGGER: ", a->trigger ,"\n" , NULL); // Add the length of these strings to the lineLength
+      updateLongestLineAndIncrementStringSize(&longestLine, &lineLength, &stringSize); // Update the variable that stores the line with the greatest length
+
+      List alarmProps = a->properties;
+      // Output the props
+      if (alarmProps.head) {
+        calculateLineLength(&lineLength, "    ALARM PROPERTIES: \n" , NULL); // Add the length of these strings to the lineLength
+        updateLongestLineAndIncrementStringSize(&longestLine, &lineLength, &stringSize); // Update the variable that stores the line with the greatest length
+
+        // Get length of each property
+        ListIterator propsIter = createIterator(alarmProps);
+        Property* p;
+
+        while ((p = nextElement(&propsIter)) != NULL) {
+          char* printedProp = printPropertyListFunction(p); // Get the string for this prop
+          calculateLineLength(&lineLength, "      ", printedProp, "\n", NULL); // Add the length of these strings to the lineLength
+          updateLongestLineAndIncrementStringSize(&longestLine, &lineLength, &stringSize); // Update the variable that stores the line with the greatest length
+          safelyFreeString(printedProp); // Free the string
+        }
+      }
+    }
+  }
+
+  List propsList = event->properties;
+  if (propsList.head) {
+
+    calculateLineLength(&lineLength, "    EVENT PROPERTIES: \n", NULL); // Add the length of these strings to the lineLength
+    updateLongestLineAndIncrementStringSize(&longestLine, &lineLength, &stringSize); // Update the variable that stores the line with the greatest length
+
+    // Get length of each property
+    ListIterator propsIter = createIterator(propsList);
+    Property* p;
+    while ((p = nextElement(&propsIter)) != NULL) {
+      char* printedProp = printPropertyListFunction(p); // Get the string for this prop
+      calculateLineLength(&lineLength, "    ", printedProp, "\n", NULL); // Add the length of these strings to the lineLength
+      updateLongestLineAndIncrementStringSize(&longestLine, &lineLength, &stringSize); // Update the variable that stores the line with the greatest length
+      safelyFreeString(printedProp); //  Free the string
+    }
+  }
+
+  char* string = malloc(stringSize + 1);
+
+  concatenateLine(string, " CALENDAR EVENT: \n", NULL);
+  // UID: some uid\n
+  concatenateLine(string, "   UID: ", event->UID, "\n", NULL);
+  // CREATION TIMESTAMP: some time\n
+  dtString = printDatePretty(event->creationDateTime);
+  concatenateLine(string, "  CREATION TIMESTAMP: ", dtString, "\n", NULL);
+  safelyFreeString(dtString);
+
+  alarms = event->alarms;
+  if (alarms.head) {
+    ListIterator alarmIterator = createIterator(alarms);
+
+    Alarm* a;
+    while ((a = nextElement(&alarmIterator)) != NULL) { // Loop through each alarm
+      concatenateLine(string, "  ALARM: \n", NULL); // Alarm header
+      concatenateLine(string, "    ACTION: ", a->action, "\n", NULL); // Alarm action
+      concatenateLine(string, "    TRIGGER: ", a->trigger, "\n", NULL); // Alarm trigger
+
+      List alarmProps = a->properties;
+      // Output the props
+      if (alarmProps.head) {
+        concatenateLine(string, "    ALARM PROPERTIES: \n", NULL); // Alarm properties header
+
+        // Get each property string
+        ListIterator propsIter = createIterator(alarmProps);
+        Property* p;
+
+        while ((p = nextElement(&propsIter)) != NULL) {
+          char* printedProp = printPropertyListFunction(p);
+          concatenateLine(string, "      ", printedProp, "\n", NULL); // Alarm properties
+          safelyFreeString(printedProp); // Free the string
+        }
+      }
+    }
+  }
+
+  // EVENT PROPERTIES: \n
+  propsList = event->properties;
+  if (propsList.head) {
+    concatenateLine(string, "  EVENT PROPERTIES: \n", NULL); // Event properties header
+
+    // print each property
+    ListIterator propsIter = createIterator(propsList);
+    Property* p;
+
+    while ((p = nextElement(&propsIter)) != NULL) {
+      char* printedProp = printPropertyListFunction(p);
+      concatenateLine(string, "   ", printedProp, "\n", NULL); // Event properties
+      safelyFreeString(printedProp);
+    }
+  }
+  return string;
+}
 
 char* printPropertyListFunction(void *toBePrinted) {
   Property* p = (Property*) toBePrinted;
@@ -431,6 +591,18 @@ char* printPropertyListFunction(void *toBePrinted) {
   strcat(string, p->propDescr);
   string[finalSize] = '\0'; // Set null terminator just in case strcat didnt
   return string;
+}
+
+int compareEventListFunction(const void *first, const void *second) {
+  Event* e1 = (Event*) first;
+  Event* e2 = (Event*) second;
+  char* s1 = e1->UID;
+  char* s2 = e2->UID;
+  int result = strcmp(s1, s2); // Compare the strings
+
+  safelyFreeString(s1); // BECAUSE I'M FREEEEE!!!!! FREE FALLIN'
+  safelyFreeString(s2);
+	return result; // Return the result
 }
 
 int comparePropertyListFunction(const void *first, const void *second) {
