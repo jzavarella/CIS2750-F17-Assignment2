@@ -34,6 +34,7 @@ int main(int argc, char const *argv[]) {
   test("tests/blank_created_t.ics", INV_CREATEDT);
   printf("----EVENT ERRORS:\n");
   test("tests/no_created_t.ics", INV_EVENT);
+  test("tests/multiple_events_one_invalid.ics", INV_EVENT);
   test("tests/no_alarm_trigger.ics", INV_EVENT);
   test("tests/no_alarm_action.ics", INV_EVENT);
   printf("----OK:\n");
@@ -44,6 +45,7 @@ int main(int argc, char const *argv[]) {
   test("tests/valid_no_alarm_lowercase.ics", OK);
   test("tests/testCalShort.ics", OK);
   test("tests/multiple_events.ics", OK);
+  test("tests/multiple_events_long.ics", OK);
   test("tests/valid_with_newlines.ics", OK);
   test("tests/testCalLong.ics", OK);
 
