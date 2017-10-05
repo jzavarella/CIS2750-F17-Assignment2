@@ -34,6 +34,10 @@ ErrorCode createCalendar(char* fileName, Calendar** obj) {
   List events = initializeList(&printEventListFunction, &deleteEventListFunction, &compareEventListFunction);
   calendar->events = events; // Assign the empty event list
 
+  // List to store calendar properties
+  List betweenVCalendarTags = initializeList(&printPropertyListFunction, &deletePropertyListFunction, &comparePropertyListFunction);
+  calendar->properties = betweenVCalendarTags;
+
   List iCalPropertyList = initializeList(&printPropertyListFunction, &deletePropertyListFunction, &comparePropertyListFunction); // Create a list to store all properties/ lines
   ErrorCode lineCheckError = readLinesIntoList(fileName, &iCalPropertyList, 512); // Read the lines of the file into a list of properties
   if (lineCheckError != OK) { // If any of the lines were invalid, this will not return OK
@@ -41,8 +45,6 @@ ErrorCode createCalendar(char* fileName, Calendar** obj) {
     return lineCheckError; // Return the error that was produced
   }
 
-  // List to store calendar properties
-  List betweenVCalendarTags = initializeList(&printPropertyListFunction, &deletePropertyListFunction, &comparePropertyListFunction);
   // Get the properties between event tags
   ErrorCode betweenVCalendarTagsError = extractBetweenTags(iCalPropertyList, &betweenVCalendarTags, INV_CAL, "VCALENDAR");
   if (betweenVCalendarTagsError != OK) { // If there was a problem parsing
@@ -106,8 +108,8 @@ ErrorCode createCalendar(char* fileName, Calendar** obj) {
   }
 
   clearList(&iCalPropertyList); // Clear lists before returning
-  clearList(&betweenVCalendarTags);
   clearList(&betweenVEventTags);
+  calendar->properties = betweenVCalendarTags; // Set the remaining properties to the calendar
   calendar->events = events; // Assign the empty event list
   return OK; // Congratulations you parsed the file. Return OK
 }
@@ -124,6 +126,8 @@ void deleteCalendar(Calendar* obj) {
   }
   List events = obj->events;
   clearList(&events);
+  List properties = obj->properties;
+  clearList(&properties);
 
   free(obj); // Free object? I Like free objects
 }
@@ -1271,8 +1275,12 @@ ErrorCode parseRequirediCalTags(List* list, Calendar* cal) {
         safelyFreeString(VERSION); // Version might be allocated so we must remove it before returning
         return INV_PRODID;
       }
-      PRODID = malloc(strlen(description) * sizeof(char));
-      memmove(PRODID, description+1, strlen(description)); // remove the first character as it is (; or :)
+      PRODID = malloc(strlen(description) * sizeof(char) + 1);
+      if (match(&description[0], "(;|:)")) {
+        memmove(PRODID, description+1, strlen(description)); // remove the first character as it is (; or :)
+      } else {
+        strcpy(PRODID, description);
+      }
     }
   }
 
@@ -1281,6 +1289,18 @@ ErrorCode parseRequirediCalTags(List* list, Calendar* cal) {
     safelyFreeString(VERSION); // Version might be allocated so we must remove it before returning
     return INV_CAL; // We are missing required tags
   }
+
+  Property* prodID = findElement(*list, &compareTags, "PRODID"); // Find the tags for prodID and version for eleting
+  Property* version = findElement(*list, &compareTags, "VERSION");
+
+  char* prodIDLine = printPropertyListFunction(prodID); // print their lines
+  char* versionLine = printPropertyListFunction(version);
+
+  deleteProperty(list, versionLine); // Delete them
+  deleteProperty(list, prodIDLine);
+
+  safelyFreeString(prodIDLine); // Free memory
+  safelyFreeString(versionLine);
 
   cal->version = atof(VERSION);
   strcpy(cal->prodID, PRODID);
@@ -1321,6 +1341,14 @@ void concatenateLine(char* string, const char* c, ... ) {
     }
    // Clear the va_list
    va_end(valist);
+}
+
+int compareTags(const void* first, const void* second) {
+  Property* p = (Property*) first;
+  char* propName = p->propName;
+  int result = strcmp(propName, (char*) second);
+  // printf("%s:%s -- %d\n", propName, (char*)second, result);
+  return result;
 }
 
 // If you made it this far, you win. Too bad the prize is nothing

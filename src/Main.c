@@ -132,7 +132,7 @@ int main(int argc, char const *argv[]) {
   deleteCalendar(ca);
   printf("\n");
   Calendar* c = (Calendar*)malloc(sizeof(Calendar));
-  ErrorCode e = createCalendar("tests/valid_with_newlines.ics", &c);
+  ErrorCode e = createCalendar("tests/testCalLong.ics", &c);
 
 
   const char* errorText = printError(e);

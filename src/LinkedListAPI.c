@@ -336,8 +336,7 @@ void* findElement(List list, int (*compare)(const void* first,const void* second
   ListIterator iter = createIterator(list);
   void* element;
   while ((element = nextElement(&iter))) { // Iterate over the list
-
-    if (compare(search, element)) { // Compare the data
+    if (compare(element, search) == 0) { // Compare the data
       return element; // If they match return the data
     }
   }

@@ -56,3 +56,4 @@ ErrorCode createEvent(List eventList, Event* event);
   *Checks to see if the required iCalendar tags are present
 */
 ErrorCode parseRequirediCalTags(List* list, Calendar* cal);
+int compareTags(const void* first, const void* second); // Predicate for comparing product tags
