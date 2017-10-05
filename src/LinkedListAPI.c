@@ -40,6 +40,10 @@ Node* initializeNode(void *data) {
     return NULL; // Data should be the same size as void pointer to avoid size conflicts
   }
 
+  if (!data) {
+    return NULL;
+  }
+
   Node* newNode = malloc(sizeof(Node)); //Allocate memory for the new node
   if (!newNode) {
     return NULL; // If malloc failed for whatever reason then return NULL

@@ -1,8 +1,10 @@
 #include <stdio.h>
 
 #include "CalendarParser.h"
+#include "HelperFunctions.h"
 
 void test(char* fileName, ErrorCode expectedResult);
+void testValidation(Calendar* c, char* testDescription, ErrorCode expectedResult);
 
 int main(int argc, char const *argv[]) {
 
@@ -35,8 +37,9 @@ int main(int argc, char const *argv[]) {
   printf("----EVENT ERRORS:\n");
   test("tests/no_created_t.ics", INV_EVENT);
   test("tests/multiple_events_one_invalid.ics", INV_EVENT);
-  test("tests/no_alarm_trigger.ics", INV_EVENT);
-  test("tests/no_alarm_action.ics", INV_EVENT);
+  printf("----ALARM ERRORS:\n");
+  test("tests/no_alarm_trigger.ics", INV_ALARM);
+  test("tests/no_alarm_action.ics", INV_ALARM);
   printf("----OK:\n");
   test("tests/valid_one_alarm.ics", OK);
   test("tests/valid_multiple_alarms.ics", OK);
@@ -48,7 +51,86 @@ int main(int argc, char const *argv[]) {
   test("tests/multiple_events_long.ics", OK);
   test("tests/valid_with_newlines.ics", OK);
   test("tests/testCalLong.ics", OK);
+  printf("\n\n------VALIDATION ERRORS:\n");
 
+  Calendar* ca = NULL;
+  testValidation(ca, "NULL CALENDAR", OTHER_ERROR);
+
+  ca = (Calendar*)calloc(sizeof(Calendar), 1);
+  testValidation(ca, "UNALLOCATED PRODID", INV_CAL);
+  strcpy(ca->prodID, "");
+  testValidation(ca, "BLANK PRODID", INV_CAL);
+  strcpy(ca->prodID, "\\\\\\\\");
+  testValidation(ca, "MALFORMED PRODID", INV_PRODID);
+  strcpy(ca->prodID, "valid"); // Valid PRODID
+  printf("----Events----\n");
+  testValidation(ca, "NO EVENTS", INV_CAL);
+  List events = initializeList(&printEventListFunction, &deleteEventListFunction, &compareEventListFunction);
+  Event* event = NULL; // NULL event
+  insertBack(&events, event); // Insert
+  ca->events = events;
+  testValidation(ca, "NULL EVENT", INV_CAL);
+  event = calloc(sizeof(Event), 1);
+  insertBack(&events, event);
+  ca->events = events;
+  testValidation(ca, "UNALLOCATED EVENT", INV_EVENT);
+  strcpy(event->UID, "");
+  testValidation(ca, "BLANK UID", INV_EVENT);
+  strcpy(event->UID, "valid"); // Valid UID
+  DateTime dt = { .date="", .time="", false}; // Blanks
+  event->creationDateTime = dt;
+  printf("----DATE-TIME----\n");
+  testValidation(ca, "BLANK DATE-TIME", INV_CREATEDT);
+  strcpy(event->creationDateTime.date, "invalid");
+  testValidation(ca, "INVALID DATE", INV_CREATEDT);
+  strcpy(event->creationDateTime.date, "20171029"); // Valid date
+  testValidation(ca, "INVALID TIME", INV_CREATEDT);
+  strcpy(event->creationDateTime.time, "101010"); // Valid time
+  printf("----PROPS----\n");
+  List eventProps = initializeList(&printPropertyListFunction, &deletePropertyListFunction, &comparePropertyListFunction); // Create a list to store all properties
+  event->properties = eventProps;
+  Property* p = calloc(sizeof(Property), 1);
+  insertBack(&(event->properties), p);
+  testValidation(ca, "BLANK PROP", INV_EVENT);
+  strcpy(p->propName, ""); // invalid prop name
+  testValidation(ca, "BLANK PROPNAME", INV_EVENT);
+  strcpy(p->propName, "HELLO"); // Valid prop name
+  testValidation(ca, "VALID EVENT NO ALARMS 1", OK);
+  char propLine[strlen("TEST:PROP") + 1];
+  strcpy(propLine, "TEST:PROP"); // Second prop
+  Property* p2 = extractPropertyFromLine(propLine);
+  insertBack(&(event->properties), p2);
+  printf("----ALARMS----\n");
+  testValidation(ca, "VALID EVENT NO ALARMS 2", OK);
+  List alarmList = initializeList(&printAlarmListFunction, &deleteAlarmListFunction, &compareAlarmListFunction);
+  event->alarms = alarmList;
+  List alarmProps = initializeList(&printPropertyListFunction, &deletePropertyListFunction, &comparePropertyListFunction); // Create a list to store all properties
+  Alarm* a = createAlarm("", "", alarmProps);
+  insertBack(&(event->alarms), a);
+  testValidation(ca, "NULL ALARM", INV_ALARM);
+  strcpy(a->action, "invalid"); // invalid action
+  testValidation(ca, "INVALID ACTION", INV_ALARM);
+  strcpy(a->action, "AUDIO"); // valid action
+  testValidation(ca, "BLANK/INVALID TRIGGER", INV_ALARM);
+  free(a->trigger);
+  a->trigger = calloc(strlen("valid") + 1, 1);
+  strcpy(a->trigger, "valid"); // valid trigger
+  testValidation(ca, "VALID ALARM NO PROPS", OK);
+  Property* p3 = calloc(sizeof(Property), 1); // blank property
+  insertBack(&(a->properties), p3);
+  testValidation(ca, "BLANK ALARM PROP", INV_ALARM);
+  strcpy(p3->propName, "VALID");
+  testValidation(ca, "VALID ALARM PROP 1", OK);
+  Property* p4 = extractPropertyFromLine(propLine);
+  insertBack(&(a->properties), p4);
+  testValidation(ca, "VALID ALARM PROP 2", OK);
+  // TODO: ADD VALIDATION FOR iCAL PROPS
+
+
+
+
+  deleteCalendar(ca);
+  printf("\n");
   Calendar* c = (Calendar*)malloc(sizeof(Calendar));
   ErrorCode e = createCalendar("tests/valid_with_newlines.ics", &c);
 
@@ -59,8 +141,23 @@ int main(int argc, char const *argv[]) {
   const char* out = printCalendar(c);
   printf("%s\n", out);
   free((char*) out);
+  testValidation(c, "VALID", OK);
   deleteCalendar(c);
   return 0;
+}
+
+void testValidation(Calendar* c, char* testDescription, ErrorCode expectedResult) {
+  ErrorCode e = validateCalendar(c);
+  const char* expectedErrorText = printError(expectedResult);
+  const char* errorText = printError(e);
+  if (e != expectedResult) {
+    printf("**FAIL**: (%s) %s was expected but recieved %s\n", testDescription, expectedErrorText, errorText);
+  } else {
+    printf("PASS: (%s) %s was expected\n", testDescription, expectedErrorText);
+  }
+
+  free((char*) expectedErrorText);
+  free((char*) errorText);
 }
 
 void test(char* fileName, ErrorCode expectedResult) {

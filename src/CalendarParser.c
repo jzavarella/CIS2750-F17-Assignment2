@@ -147,7 +147,7 @@ char* printCalendar(const Calendar* obj) {
   if (strlen(obj->prodID) == 0) {
     return NULL; // Must have a prodID
   }
-  calculateLineLength(&lineLength, "  PRODUCT ID: ", obj->prodID, "\n", NULL); // Add the length of these strings to the lineLength
+  calculateLineLength(&lineLength, "\tPRODUCT ID: ", obj->prodID, "\n", NULL); // Add the length of these strings to the lineLength
   updateLongestLineAndIncrementStringSize(&longestLine, &lineLength, &stringSize); // Update the variable that stores the line with the greatest length
 
   // VERSION: 2.0\n
@@ -160,8 +160,6 @@ char* printCalendar(const Calendar* obj) {
 
   calculateLineLength(&lineLength, "  VERSION: ", vString, "\n", NULL); // Add the length of these strings to the lineLength
   updateLongestLineAndIncrementStringSize(&longestLine, &lineLength, &stringSize); // Update the variable that stores the line with the greatest length
-
-  stringSize += 1; // newline
 
   List events = obj->events;
   ListIterator eventIter = createIterator(events);
@@ -264,15 +262,13 @@ char* printCalendar(const Calendar* obj) {
   concatenateLine(string, " PRODUCT ID: ", obj->prodID, "\n", NULL);
   // VERSION: 2.0\n
   concatenateLine(string, " VERSION: ", vString, "\n", NULL);
-  // newline
-  concatenateLine(string, "\n", NULL);
 
   eventIter = createIterator(events);
 
   while ((event = nextElement(&eventIter))) {
     concatenateLine(string, " CALENDAR EVENT: \n", NULL);
     // UID: some uid\n
-    concatenateLine(string, "   UID: ", event->UID, "\n", NULL);
+    concatenateLine(string, "  UID: ", event->UID, "\n", NULL);
     // CREATION TIMESTAMP: some time\n
     char* dtString = printDatePretty(event->creationDateTime);
     concatenateLine(string, "  CREATION TIMESTAMP: ", dtString, "\n", NULL);
@@ -373,6 +369,14 @@ const char* printError(ErrorCode err) {
       error = malloc(sizeof("Malformed Date"));
       strcpy(error, "Malformed Date");
       break;
+    case INV_ALARM:
+      error = malloc(sizeof("Alarm Error"));
+      strcpy(error, "Alarm Error");
+      break;
+    case WRITE_ERROR:
+      error = malloc(sizeof("File Write Error"));
+      strcpy(error, "File Write Error");
+      break;
     case OTHER_ERROR:
       error = malloc(sizeof("Generic Error")); // This error may be generic, but you aren't :)
       strcpy(error, "Generic Error");
@@ -383,6 +387,86 @@ const char* printError(ErrorCode err) {
       break;
   }
   return error;
+}
+
+/** Function to writing a Calendar object into a file in iCalendar format.
+ *@pre Calendar object exists, is not null, and is valid
+ *@post Calendar has not been modified in any way, and a file representing the
+        Calendar contents in iCalendar format has been created
+ *@return the error code indicating success or the error encountered when parsing the calendar
+ *@param obj - a pointer to a Calendar struct
+ **/
+ErrorCode writeCalendar(char* fileName, const Calendar* obj) {
+  // TODO:
+  return OK;
+}
+
+/** Function to validating an existing a Calendar object
+ *@pre Calendar object exists and is not null
+ *@post Calendar has not been modified in any way
+ *@return the error code indicating success or the error encountered when validating the calendar
+ *@param obj - a pointer to a Calendar struct
+ **/
+ErrorCode validateCalendar(const Calendar* obj) {
+  if (!obj) {
+    return OTHER_ERROR; // If the sent object is null
+  }
+
+  // TODO: validate version
+
+  if (strcmp(obj->prodID, "") == 0) {
+    return INV_CAL; // prodID if missing
+  }
+
+  if (!matchTEXTField(obj->prodID)) {
+    return INV_PRODID; // prodID is malformed
+  }
+
+  if (getLength(obj->events) < 1) {
+    return INV_CAL; // Must have at least one event
+  }
+
+  ListIterator eventIter = createIterator(obj->events);
+  Event* ev;
+
+  while ((ev = nextElement(&eventIter))) { // Loop through all events
+    if (strlen(ev->UID) < 1) {
+      return INV_EVENT; // UID cannot be blank
+    }
+    DateTime dt = ev->creationDateTime;
+    if (!match(dt.date, "^[[:digit:]]{8}$") || !match(dt.time, "^[[:digit:]]{6}$")) { // Match valid dates
+      return INV_CREATEDT;
+    }
+
+    ListIterator propIter = createIterator(ev->properties);
+    Property* p;
+
+    while ((p = nextElement(&propIter))) {
+      if (strlen(p->propName) == 0) {
+        return INV_EVENT;
+      }
+    }
+
+    ListIterator alarmIter = createIterator(ev->alarms);
+    Alarm* a;
+    while ((a = nextElement(&alarmIter))) {
+      if (!match(a->action, "^(AUDIO|DISPLAY|EMAIL)$") || (strcmp(a->trigger, "") == 0)) {
+        return INV_ALARM;
+      }
+
+      ListIterator aPropIter = createIterator(a->properties);
+      Property* ap;
+
+      while ((ap = nextElement(&aPropIter))) {
+        if (strlen(ap->propName) == 0) {
+          return INV_ALARM;
+        }
+      }
+    }
+  }
+
+  return OK;
+
 }
 
 // <------START OF HELPER FUNCTIONS----->
@@ -408,7 +492,7 @@ int match(const char* string, char* pattern) {
 }
 
 int matchTEXTField(const char* propDescription) {
-  return match(propDescription, "^(;|:)[^[:cntrl:]\"\\,:;]+$"); // This regex matches valid text characters
+  return match(propDescription, "^(;|:){0,1}[^[:cntrl:]\"\\,:;]+$"); // This regex matches valid text characters
 }
 
 // Check if the string is allocated before freeing it
@@ -698,7 +782,7 @@ Alarm* createAlarm(char* action, char* trigger, List properties) {
     memmove(action, action + 1, strlen(action));
   }
   strcpy(alarm->action, action); // Copy the action
-  alarm->trigger = malloc(strlen(trigger) + 1); // Allocate room for trigger
+  alarm->trigger = calloc(strlen(trigger) + 1, 1); // Allocate room for trigger
 
   if (!alarm->trigger) {
     free(alarm); // Free alarm before returning
@@ -735,7 +819,7 @@ Alarm* createAlarmFromPropList(List props) {
     char tempDescription[strlen(propDescr) + 2]; //
     strcpy(tempDescription, propDescr);
     memmove(tempDescription, tempDescription+1, strlen(tempDescription)); // remove the first character as it is (; or :)
-    if (match(propName, "^ACTION")) {
+    if (match(propName, "^ACTION$")) {
       if (ACTION || !match(tempDescription, "^(AUDIO|DISPLAY|EMAIL)$")) {
         clearList(&alarmProps);
         return NULL; // Already have an ACTION or description is null
@@ -1043,7 +1127,7 @@ void removeIntersectionOfLists(List* l1, List l2) {
 }
 
 Event* newEmptyEvent() {
-  Event* e = malloc(sizeof(Event)); // MAKE ROOM FOR ME, GOSH!
+  Event* e = calloc(sizeof(Event), 1); // MAKE ROOM FOR ME, GOSH!
   e->properties = initializeList(&printPropertyListFunction, &deletePropertyListFunction, &comparePropertyListFunction); // Set the lists
   e->alarms = initializeList(&printAlarmListFunction, &deleteAlarmListFunction, &compareAlarmListFunction);
   return e; // We done
@@ -1086,7 +1170,7 @@ ErrorCode createEvent(List eventList, Event* event) {
     } else {
       clearList(&newEventList); // Clear lists before returning
       clearList(&alarmPropList);
-      return INV_EVENT; // Invalid event
+      return INV_ALARM; // Invalid event
     }
     clearList(&alarmPropList); // Clear the list
   }
