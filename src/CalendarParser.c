@@ -15,6 +15,125 @@
 #include "CalendarParser.h"
 #include "HelperFunctions.h"
 
+ErrorCode validateCalendarProps(List props) {
+  size_t numUniqueProps = 2;
+  int uniqueProps[numUniqueProps];
+
+  for (size_t i = 0; i < numUniqueProps; i++) {
+    uniqueProps[i] = 0; // Set number of all unique props to 0
+  }
+
+  ListIterator iter = createIterator(props);
+  Property* p;
+  while ((p = nextElement(&iter))) { // Loop through the props
+    char* propName = p->propName;
+    char* propDesc = p->propDescr;
+    if (match(propName, "^CALSCALE$")) {
+      if (!matchTEXTField(propDesc)) {
+        printf("%s is not a valid CALSCALE\n", propDesc);
+        return INV_CAL;
+      }
+      uniqueProps[0] ++;
+    } else if (match(propName, "^METHOD$")) {
+      if (!matchTEXTField(propDesc)) {
+        printf("%s is not a valid METHOD\n", propDesc);
+        return INV_CAL;
+      }
+      uniqueProps[1] ++;
+    }
+
+    else {
+      return INV_CAL;
+    }
+  }
+
+  for (size_t i = 0; i < numUniqueProps; i++) {
+    if (uniqueProps[i] > 1) { // if we have more than one of each uniqueProp then we have failed
+      return INV_CAL;
+    }
+  }
+
+  return OK; // We made it
+}
+
+ErrorCode validateEventProps(List props) {
+  size_t numUniqueProps = 2;
+  int uniqueProps[numUniqueProps];
+
+  for (size_t i = 0; i < numUniqueProps; i++) {
+    uniqueProps[i] = 0; // Set number of all unique props to 0
+  }
+
+  ListIterator iter = createIterator(props);
+  Property* p;
+  while ((p = nextElement(&iter))) { // Loop through the props
+    char* propName = p->propName;
+    char* propDesc = p->propDescr;
+    if (match(propName, "^ATTACH$")) {
+      if (!matchTEXTField(propDesc)) {
+        printf("%s is not a valid ATTACH\n", propDesc);
+        return INV_EVENT;
+      }
+    } else if (match(propName, "^CATEGORIES$")) {
+      if (!matchTEXTField(propDesc)) {
+        printf("%s is not a valid CATEGORIES\n", propDesc);
+        return INV_EVENT;
+      }
+    }
+
+    else {
+      return INV_EVENT;
+    }
+  }
+
+  for (size_t i = 0; i < numUniqueProps; i++) {
+    if (uniqueProps[i] > 1) { // if we have more than one of each uniqueProp then we have failed
+      return INV_EVENT;
+    }
+  }
+
+  return OK; // We made it
+}
+
+ErrorCode validateAlarmProps(List props) {
+  size_t numUniqueProps = 2;
+  int uniqueProps[numUniqueProps];
+
+  for (size_t i = 0; i < numUniqueProps; i++) {
+    uniqueProps[i] = 0; // Set number of all unique props to 0
+  }
+
+  ListIterator iter = createIterator(props);
+  Property* p;
+  while ((p = nextElement(&iter))) { // Loop through the props
+    char* propName = p->propName;
+    char* propDesc = p->propDescr;
+    if (match(propName, "^ATTACH$")) {
+      if (!matchTEXTField(propDesc)) {
+        printf("%s is not a valid ATTACH\n", propDesc);
+        return INV_ALARM;
+      }
+    } else if (match(propName, "^METHOD$")) {
+      if (!matchTEXTField(propDesc)) {
+        printf("%s is not a valid METHOD\n", propDesc);
+        return INV_ALARM;
+      }
+      uniqueProps[1] ++;
+    }
+
+    else {
+      return INV_ALARM;
+    }
+  }
+
+  for (size_t i = 0; i < numUniqueProps; i++) {
+    if (uniqueProps[i] > 1) { // if we have more than one of each uniqueProp then we have failed
+      return INV_ALARM;
+    }
+  }
+
+  return OK; // We made it
+}
 
 /** Function to create a Calendar object based on the contents of an iCalendar file.
  *@pre File name cannot be an empty string or NULL.  File name must have the .ics extension.
@@ -106,6 +225,15 @@ ErrorCode createCalendar(char* fileName, Calendar** obj) {
     clearList(&betweenVEventTags);
     clearList(&events);
     return iCalIdErrors; // Return the error that was produced
+  }
+
+  ErrorCode validCalProps = validateCalendarProps(betweenVCalendarTags);
+  if (validCalProps != OK) { // If there was a problem
+    clearList(&iCalPropertyList); // Clear lists before returning
+    clearList(&betweenVCalendarTags);
+    clearList(&betweenVEventTags);
+    clearList(&events);
+    return validCalProps; // Return the error that was produced
   }
 
   clearList(&iCalPropertyList); // Clear lists before returning
