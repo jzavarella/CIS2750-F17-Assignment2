@@ -29,7 +29,9 @@
  *@param a double pointer to a Calendar struct that needs to be allocated
 **/
 ErrorCode createCalendar(char* fileName, Calendar** obj) {
+  *obj = malloc(sizeof(Calendar));
   Calendar* calendar = *obj;
+
   strcpy(calendar->prodID, ""); // Ensure that this field is not blank to prevent uninitialized conditional jump errors in valgrind
 
   List events = initializeList(&printEventListFunction, &deleteEventListFunction, &compareEventListFunction);
@@ -471,7 +473,7 @@ ErrorCode writeCalendar(char* fileName, const Calendar* obj) {
 
   const char deliminer[2] = "\n"; // Break the lines of the to string at newline
 
-  fprintf(file, "%s%s\n", "BEGIN:", stack[stackPointer]); // Write the begin tag which will always be BEGIN:VCALENDAR in this case
+  fprintf(file, "%s%s\r\n", "BEGIN:", stack[stackPointer]); // Write the begin tag which will always be BEGIN:VCALENDAR in this case
   // push stack
   stackPointer ++;
 
@@ -492,7 +494,7 @@ ErrorCode writeCalendar(char* fileName, const Calendar* obj) {
       if (previousSpaces <= currentSpaces) {
         if (match(line, "CALENDAR EVENT:") || (match(line, "ALARM:"))) {
           // push the stack
-          fprintf(file, "%s%s\n", "BEGIN:", stack[stackPointer]);
+          fprintf(file, "%s%s\r\n", "BEGIN:", stack[stackPointer]);
           stackPointer ++;
         } else if (match(line, "ALARM PROPERTIES:") || match(line, "EVENT PROPERTIES:") || match(line, "CALENDAR PROPERTIES:")) {
           previousSpaces = currentSpaces;
@@ -501,19 +503,19 @@ ErrorCode writeCalendar(char* fileName, const Calendar* obj) {
         } else {
           size_t len = strlen(line);
           memmove(line, line+currentSpaces, len - currentSpaces + 1); // Remove spaces from the beginning of line
-          fprintf(file, "%s\n", line);
+          fprintf(file, "%s\r\n", line);
         }
       } else if (previousSpaces > currentSpaces) {
         int difference = previousSpaces - currentSpaces;
         do {
           // pop the stack
           stackPointer --;
-          fprintf(file, "%s%s\n", "END:", stack[stackPointer]);
+          fprintf(file, "%s%s\r\n", "END:", stack[stackPointer]);
           difference --;
         } while(difference > 1);
         if (match(line, "CALENDAR EVENT:") || (match(line, "ALARM:"))) {
           // push the stack
-          fprintf(file, "%s%s\n", "BEGIN:", stack[stackPointer]);
+          fprintf(file, "%s%s\r\n", "BEGIN:", stack[stackPointer]);
           stackPointer ++;
         } else if (match(line, "ALARM PROPERTIES:") || match(line, "EVENT PROPERTIES:") || match(line, "CALENDAR PROPERTIES:")) {
           previousSpaces = currentSpaces;
@@ -527,7 +529,7 @@ ErrorCode writeCalendar(char* fileName, const Calendar* obj) {
   }
   while (stackPointer != 0) { // While we still have items in the stack
     stackPointer --;
-    fprintf(file, "%s%s\n", "END:", stack[stackPointer]);
+    fprintf(file, "%s%s\r\n", "END:", stack[stackPointer]);
   }
   free(string); // Free string
   fclose(file); // Close file before returning
@@ -1126,7 +1128,9 @@ ErrorCode readLinesIntoList(char* fileName, List* list, int bufferSize) {
         if ((int)strlen(line) - 2 >= 0 && line[strlen(line) - 2] == '\r') { // Remove carriage return if it exists
           line[strlen(line) - 2] = '\0';
         } else {
-          line[strlen(line) - 1] = '\0';
+          safelyFreeString(line);
+          fclose(file);
+          return INV_FILE;
         }
       }
       Property* p = extractPropertyFromLine(line);
