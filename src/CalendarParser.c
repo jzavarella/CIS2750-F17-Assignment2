@@ -15,6 +15,7 @@
 #include "CalendarParser.h"
 #include "HelperFunctions.h"
 
+
 /** Function to create a Calendar object based on the contents of an iCalendar file.
  *@pre File name cannot be an empty string or NULL.  File name must have the .ics extension.
        File represented by this name must exist and must be readable.
@@ -142,6 +143,11 @@ char* printCalendar(const Calendar* obj) {
   if (!obj) {
     return NULL; // If the object does not exist dont do anything
   }
+
+  if (validateCalendar(obj) != OK) { // Validate the calendar before outputting
+    return NULL;
+  }
+
   char* string;
   size_t stringSize = 0; // Total size of the completed string
   size_t lineLength = 0; // Size of the current line we are calculating
@@ -151,7 +157,7 @@ char* printCalendar(const Calendar* obj) {
   if (strlen(obj->prodID) == 0) {
     return NULL; // Must have a prodID
   }
-  calculateLineLength(&lineLength, "\tPRODUCT ID: ", obj->prodID, "\n", NULL); // Add the length of these strings to the lineLength
+  calculateLineLength(&lineLength, " PRODID:", obj->prodID, "\n", NULL); // Add the length of these strings to the lineLength
   updateLongestLineAndIncrementStringSize(&longestLine, &lineLength, &stringSize); // Update the variable that stores the line with the greatest length
 
   // VERSION: 2.0\n
@@ -162,7 +168,7 @@ char* printCalendar(const Calendar* obj) {
   char vString[snprintf(NULL, 0, "%f", obj->version) + 1];
   snprintf(vString, sizeof(vString) + 1, "%f", obj->version);
 
-  calculateLineLength(&lineLength, "  VERSION: ", vString, "\n", NULL); // Add the length of these strings to the lineLength
+  calculateLineLength(&lineLength, " VERSION:", vString, "\n", NULL); // Add the length of these strings to the lineLength
   updateLongestLineAndIncrementStringSize(&longestLine, &lineLength, &stringSize); // Update the variable that stores the line with the greatest length
 
   List events = obj->events;
@@ -170,7 +176,7 @@ char* printCalendar(const Calendar* obj) {
   Event* event;
 
   while ((event = nextElement(&eventIter))) {
-    calculateLineLength(&lineLength, " CALENDAR EVENT: \n" , NULL); // Add the length of these strings to the lineLength
+    calculateLineLength(&lineLength, " CALENDAR EVENT:\n" , NULL); // Add the length of these strings to the lineLength
     updateLongestLineAndIncrementStringSize(&longestLine, &lineLength, &stringSize); // Update the variable that stores the line with the greatest length
 
     // UID: some uid\n
@@ -178,12 +184,12 @@ char* printCalendar(const Calendar* obj) {
       return NULL;
     }
 
-    calculateLineLength(&lineLength, "  UID: ", event->UID, "\n" , NULL); // Add the length of these strings to the lineLength
+    calculateLineLength(&lineLength, "  UID:", event->UID, "\n" , NULL); // Add the length of these strings to the lineLength
     updateLongestLineAndIncrementStringSize(&longestLine, &lineLength, &stringSize); // Update the variable that stores the line with the greatest length
 
     // CREATION TIMESTAMP: some time\n
     char* dtString = printDatePretty(event->creationDateTime);
-    calculateLineLength(&lineLength, "  CREATION TIMESTAMP: ", dtString, "\n" , NULL); // Add the length of these strings to the lineLength
+    calculateLineLength(&lineLength, "  DTSTAMP:", dtString, "\n" , NULL); // Add the length of these strings to the lineLength
     safelyFreeString(dtString);
     updateLongestLineAndIncrementStringSize(&longestLine, &lineLength, &stringSize); // Update the variable that stores the line with the greatest length
 
@@ -193,27 +199,27 @@ char* printCalendar(const Calendar* obj) {
 
       Alarm* a;
       while ((a = nextElement(&alarmIterator)) != NULL) { // Loop through each alarm
-        calculateLineLength(&lineLength, "  ALARM: \n" , NULL); // Add the length of these strings to the lineLength
+        calculateLineLength(&lineLength, "  ALARM:\n" , NULL); // Add the length of these strings to the lineLength
         updateLongestLineAndIncrementStringSize(&longestLine, &lineLength, &stringSize); // Update the variable that stores the line with the greatest length
 
         if (strlen(a->action) == 0) {
           return NULL; // Action is empty return null
         }
         // Get the length of the Action line
-        calculateLineLength(&lineLength, "    ACTION: ", a->action, "\n" , NULL); // Add the length of these strings to the lineLength
+        calculateLineLength(&lineLength, "   ACTION:", a->action, "\n" , NULL); // Add the length of these strings to the lineLength
         updateLongestLineAndIncrementStringSize(&longestLine, &lineLength, &stringSize); // Update the variable that stores the line with the greatest length
 
         if (strlen(a->trigger) == 0) {
           return NULL; // Action is empty return null
         }
         // Get the length of the Trigger line
-        calculateLineLength(&lineLength, "    TRIGGER: ", a->trigger ,"\n" , NULL); // Add the length of these strings to the lineLength
+        calculateLineLength(&lineLength, "   TRIGGER:", a->trigger ,"\n" , NULL); // Add the length of these strings to the lineLength
         updateLongestLineAndIncrementStringSize(&longestLine, &lineLength, &stringSize); // Update the variable that stores the line with the greatest length
 
         List alarmProps = a->properties;
         // Output the props
         if (alarmProps.head) {
-          calculateLineLength(&lineLength, "    ALARM PROPERTIES: \n" , NULL); // Add the length of these strings to the lineLength
+          calculateLineLength(&lineLength, "   ALARM PROPERTIES:\n" , NULL); // Add the length of these strings to the lineLength
           updateLongestLineAndIncrementStringSize(&longestLine, &lineLength, &stringSize); // Update the variable that stores the line with the greatest length
 
           // Get length of each property
@@ -233,7 +239,7 @@ char* printCalendar(const Calendar* obj) {
     List propsList = event->properties;
     if (propsList.head) {
 
-      calculateLineLength(&lineLength, "    EVENT PROPERTIES: \n", NULL); // Add the length of these strings to the lineLength
+      calculateLineLength(&lineLength, "  EVENT PROPERTIES:\n", NULL); // Add the length of these strings to the lineLength
       updateLongestLineAndIncrementStringSize(&longestLine, &lineLength, &stringSize); // Update the variable that stores the line with the greatest length
 
       // Get length of each property
@@ -241,10 +247,27 @@ char* printCalendar(const Calendar* obj) {
       Property* p;
       while ((p = nextElement(&propsIter)) != NULL) {
         char* printedProp = printPropertyListFunction(p); // Get the string for this prop
-        calculateLineLength(&lineLength, "    ", printedProp, "\n", NULL); // Add the length of these strings to the lineLength
+        calculateLineLength(&lineLength, "   ", printedProp, "\n", NULL); // Add the length of these strings to the lineLength
         updateLongestLineAndIncrementStringSize(&longestLine, &lineLength, &stringSize); // Update the variable that stores the line with the greatest length
         safelyFreeString(printedProp); //  Free the string
       }
+    }
+  }
+
+  List calPropsList = obj->properties;
+  if (calPropsList.head) {
+
+    calculateLineLength(&lineLength, " CALENDAR PROPERTIES:\n", NULL); // Add the length of these strings to the lineLength
+    updateLongestLineAndIncrementStringSize(&longestLine, &lineLength, &stringSize); // Update the variable that stores the line with the greatest length
+
+    // Get length of each property
+    ListIterator propsIter = createIterator(calPropsList);
+    Property* p;
+    while ((p = nextElement(&propsIter)) != NULL) {
+      char* printedProp = printPropertyListFunction(p); // Get the string for this prop
+      calculateLineLength(&lineLength, "  ", printedProp, "\n", NULL); // Add the length of these strings to the lineLength
+      updateLongestLineAndIncrementStringSize(&longestLine, &lineLength, &stringSize); // Update the variable that stores the line with the greatest length
+      safelyFreeString(printedProp); //  Free the string
     }
   }
 
@@ -263,19 +286,19 @@ char* printCalendar(const Calendar* obj) {
   strcpy(string, cap); // Header
 
   // PRODUCT ID: Something\n
-  concatenateLine(string, " PRODUCT ID: ", obj->prodID, "\n", NULL);
+  concatenateLine(string, " PRODID:", obj->prodID, "\n", NULL);
   // VERSION: 2.0\n
-  concatenateLine(string, " VERSION: ", vString, "\n", NULL);
+  concatenateLine(string, " VERSION:", vString, "\n", NULL);
 
   eventIter = createIterator(events);
 
   while ((event = nextElement(&eventIter))) {
-    concatenateLine(string, " CALENDAR EVENT: \n", NULL);
+    concatenateLine(string, " CALENDAR EVENT:\n", NULL);
     // UID: some uid\n
-    concatenateLine(string, "  UID: ", event->UID, "\n", NULL);
+    concatenateLine(string, "  UID:", event->UID, "\n", NULL);
     // CREATION TIMESTAMP: some time\n
     char* dtString = printDatePretty(event->creationDateTime);
-    concatenateLine(string, "  CREATION TIMESTAMP: ", dtString, "\n", NULL);
+    concatenateLine(string, "  DTSTAMP:", dtString, "\n", NULL);
     safelyFreeString(dtString);
 
     List alarms = event->alarms;
@@ -284,14 +307,14 @@ char* printCalendar(const Calendar* obj) {
 
       Alarm* a;
       while ((a = nextElement(&alarmIterator)) != NULL) { // Loop through each alarm
-        concatenateLine(string, "  ALARM: \n", NULL); // Alarm header
-        concatenateLine(string, "    ACTION: ", a->action, "\n", NULL); // Alarm action
-        concatenateLine(string, "    TRIGGER: ", a->trigger, "\n", NULL); // Alarm trigger
+        concatenateLine(string, "  ALARM:\n", NULL); // Alarm header
+        concatenateLine(string, "   ACTION:", a->action, "\n", NULL); // Alarm action
+        concatenateLine(string, "   TRIGGER:", a->trigger, "\n", NULL); // Alarm trigger
 
         List alarmProps = a->properties;
         // Output the props
         if (alarmProps.head) {
-          concatenateLine(string, "    ALARM PROPERTIES: \n", NULL); // Alarm properties header
+          concatenateLine(string, "   ALARM PROPERTIES:\n", NULL); // Alarm properties header
 
           // Get each property string
           ListIterator propsIter = createIterator(alarmProps);
@@ -299,7 +322,7 @@ char* printCalendar(const Calendar* obj) {
 
           while ((p = nextElement(&propsIter)) != NULL) {
             char* printedProp = printPropertyListFunction(p);
-            concatenateLine(string, "      ", printedProp, "\n", NULL); // Alarm properties
+            concatenateLine(string, "    ", printedProp, "\n", NULL); // Alarm properties
             safelyFreeString(printedProp); // Free the string
           }
         }
@@ -309,7 +332,7 @@ char* printCalendar(const Calendar* obj) {
     // EVENT PROPERTIES: \n
     List propsList = event->properties;
     if (propsList.head) {
-      concatenateLine(string, "  EVENT PROPERTIES: \n", NULL); // Event properties header
+      concatenateLine(string, "  EVENT PROPERTIES:\n", NULL); // Event properties header
 
       // print each property
       ListIterator propsIter = createIterator(propsList);
@@ -320,6 +343,21 @@ char* printCalendar(const Calendar* obj) {
         concatenateLine(string, "   ", printedProp, "\n", NULL); // Event properties
         safelyFreeString(printedProp);
       }
+    }
+  }
+
+  // EVENT PROPERTIES: \n
+  if (calPropsList.head) {
+    concatenateLine(string, " CALENDAR PROPERTIES:\n", NULL); // Event properties header
+
+    // print each property
+    ListIterator propsIter = createIterator(calPropsList);
+    Property* p;
+
+    while ((p = nextElement(&propsIter)) != NULL) {
+      char* printedProp = printPropertyListFunction(p);
+      concatenateLine(string, "  ", printedProp, "\n", NULL); // Event properties
+      safelyFreeString(printedProp);
     }
   }
 
@@ -393,6 +431,15 @@ const char* printError(ErrorCode err) {
   return error;
 }
 
+int getSpaces(char* line) {
+  int count = 0;
+  char c;
+  while ((c = line[count]) == ' ') {
+    count ++;
+  }
+  return count;
+}
+
 /** Function to writing a Calendar object into a file in iCalendar format.
  *@pre Calendar object exists, is not null, and is valid
  *@post Calendar has not been modified in any way, and a file representing the
@@ -401,7 +448,88 @@ const char* printError(ErrorCode err) {
  *@param obj - a pointer to a Calendar struct
  **/
 ErrorCode writeCalendar(char* fileName, const Calendar* obj) {
-  // TODO:
+
+  FILE* file;
+  if (!match(fileName, ".+\\.ics$") || !((file = fopen(fileName, "w+")))) { // If the file name does not match the valid ical regex or file cannot be opened
+    return INV_FILE;
+  }
+
+  ErrorCode error = validateCalendar(obj); // Validate the calendar
+  if (error != OK) {
+    fclose(file); // close the file before returning
+    return error;
+  }
+
+  char* string = printCalendar(obj);
+  if (!string) { // If we couldnt parse the calendar into a string
+    fclose(file); // close the file before returning
+    return OTHER_ERROR;
+  }
+
+  char stack[3][80];
+  strcpy(stack[0], "VCALENDAR");
+  strcpy(stack[1], "VEVENT");
+  strcpy(stack[2], "VALARM");
+
+  int stackPointer = 0;
+
+  const char deliminer[2] = "\n";
+  fprintf(file, "%s%s\n", "BEGIN:", stack[stackPointer]);
+  // push stack
+  stackPointer ++;
+
+  char *line;
+  line = strtok(string, deliminer);
+  int previousSpaces = 0;
+  int currentSpaces = 0;
+  while(line != NULL) { // Process each line of the output
+    if (!match(line, "^-+$")) {
+      currentSpaces = getSpaces(line);
+      if (previousSpaces <= currentSpaces) {
+        if (match(line, "CALENDAR EVENT:") || (match(line, "ALARM:"))) {
+          // push the stack
+          fprintf(file, "%s%s\n", "BEGIN:", stack[stackPointer]);
+          stackPointer ++;
+        } else if (match(line, "ALARM PROPERTIES:") || match(line, "EVENT PROPERTIES:") || match(line, "CALENDAR PROPERTIES:")) {
+          previousSpaces = currentSpaces;
+          line = strtok(NULL, deliminer);
+          continue; // we dont want to print these lines
+        } else {
+          size_t len = strlen(line);
+          memmove(line, line+currentSpaces, len - currentSpaces + 1); // Remove spaces from the beginning of line
+          if (match(line, "^DTSTAMP")) {
+            // We need to manipu
+          }
+          fprintf(file, "%s\n", line);
+        }
+      } else if (previousSpaces > currentSpaces) {
+        int difference = previousSpaces - currentSpaces;
+        do {
+          // pop the stack
+          stackPointer --;
+          fprintf(file, "%s%s\n", "END:", stack[stackPointer]);
+          difference --;
+        } while(difference > 1);
+        if (match(line, "CALENDAR EVENT:") || (match(line, "ALARM:"))) {
+          // push the stack
+          fprintf(file, "%s%s\n", "BEGIN:", stack[stackPointer]);
+          stackPointer ++;
+        } else if (match(line, "ALARM PROPERTIES:") || match(line, "EVENT PROPERTIES:") || match(line, "CALENDAR PROPERTIES:")) {
+          previousSpaces = currentSpaces;
+          line = strtok(NULL, deliminer); // We dont want to print these lines
+          continue;
+        }
+      }
+    }
+    previousSpaces = currentSpaces;
+    line = strtok(NULL, deliminer);
+  }
+  while (stackPointer != 0) { // While we still have items in the stack
+    stackPointer --;
+    fprintf(file, "%s%s\n", "END:", stack[stackPointer]);
+  }
+  free(string);
+  fclose(file);
   return OK;
 }
 
@@ -416,7 +544,9 @@ ErrorCode validateCalendar(const Calendar* obj) {
     return OTHER_ERROR; // If the sent object is null
   }
 
-  // TODO: validate version
+  if (!obj->version) {
+    return INV_VER; // Must have a version
+  }
 
   if (strcmp(obj->prodID, "") == 0) {
     return INV_CAL; // prodID if missing
@@ -466,6 +596,15 @@ ErrorCode validateCalendar(const Calendar* obj) {
           return INV_ALARM;
         }
       }
+    }
+  }
+
+  ListIterator calPropIter = createIterator(obj->properties);
+  Property* cp;
+
+  while ((cp = nextElement(&calPropIter))) {
+    if (strlen(cp->propName) == 0) {
+      return OTHER_ERROR;
     }
   }
 
@@ -674,8 +813,14 @@ char* printPropertyListFunction(void *toBePrinted) {
     i ++; // Calculate length of description
   }
   finalSize += i; // add it up again
-  char* string = malloc(finalSize + 1); // +1 to make room for NULL terminator
+  if (p->propDescr[0] != ';' && p->propDescr[0] != ':') {
+    finalSize ++;
+  }
+  char* string = calloc(finalSize + 1, 1); // +1 to make room for NULL terminator
   strcpy(string, p->propName);
+  if (p->propDescr[0] != ';' && p->propDescr[0] != ':') {
+    strcat(string, ":");
+  }
   strcat(string, p->propDescr);
   string[finalSize] = '\0'; // Set null terminator just in case strcat didnt
   return string;
@@ -771,8 +916,9 @@ void deleteAlarmListFunction(void *toBeDeleted) {
 }
 
 Property* createProperty(char* propName, char* propDescr) {
-  Property* p = malloc(sizeof(Property) + strlen(propDescr)*sizeof(char*) + strlen(propName)); // Allocate room for the property and the flexible array member
+  Property* p = calloc(sizeof(Property) + strlen(propDescr)*sizeof(char*) + 1 /* this 1 is to make room for null terminator */ + strlen(propName), 1); // Allocate room for the property and the flexible array member
   strcpy(p->propName, propName); // Copy prop name over
+  p->propDescr[0] = '\0';
   strcpy(p->propDescr, propDescr); // Copy prop description over
   return p; // Send it back
 }
@@ -920,7 +1066,6 @@ Property* extractPropertyFromLine(char* line) {
   memcpy(propDescr, tempLine + substring, descriptionLength);
   propDescr[descriptionLength] = '\0';
   Property* p = createProperty(propName, propDescr);
-  // safelyFreeString(propName);
   return p;
 }
 
@@ -1075,7 +1220,7 @@ char* printDatePretty(DateTime dt) {
 
   char* string = malloc(size + 1 * (sizeof(char)));
   strcpy(string, dt.date);
-  strcat(string, " ");
+  strcat(string, "T");
   strcat(string, dt.time);
   if (dt.UTC) {
     strcat(string, "Z");
@@ -1346,9 +1491,7 @@ void concatenateLine(char* string, const char* c, ... ) {
 int compareTags(const void* first, const void* second) {
   Property* p = (Property*) first;
   char* propName = p->propName;
-  int result = strcmp(propName, (char*) second);
-  // printf("%s:%s -- %d\n", propName, (char*)second, result);
-  return result;
+  return strcmp(propName, (char*) second);
 }
 
 // If you made it this far, you win. Too bad the prize is nothing

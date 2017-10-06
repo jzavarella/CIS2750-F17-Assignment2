@@ -57,6 +57,8 @@ int main(int argc, char const *argv[]) {
   testValidation(ca, "NULL CALENDAR", OTHER_ERROR);
 
   ca = (Calendar*)calloc(sizeof(Calendar), 1);
+  testValidation(ca, "UNALLOCATED VERSION", INV_VER);
+  ca->version = 2.0;
   testValidation(ca, "UNALLOCATED PRODID", INV_CAL);
   strcpy(ca->prodID, "");
   testValidation(ca, "BLANK PRODID", INV_CAL);
@@ -89,12 +91,13 @@ int main(int argc, char const *argv[]) {
   printf("----PROPS----\n");
   List eventProps = initializeList(&printPropertyListFunction, &deletePropertyListFunction, &comparePropertyListFunction); // Create a list to store all properties
   event->properties = eventProps;
-  Property* p = calloc(sizeof(Property), 1);
+  Property* p = calloc(sizeof(Property) + 80, 1);
   insertBack(&(event->properties), p);
   testValidation(ca, "BLANK PROP", INV_EVENT);
   strcpy(p->propName, ""); // invalid prop name
   testValidation(ca, "BLANK PROPNAME", INV_EVENT);
   strcpy(p->propName, "HELLO"); // Valid prop name
+  insertBack(&(event->properties), createProperty("yo", ""));
   testValidation(ca, "VALID EVENT NO ALARMS 1", OK);
   char propLine[strlen("TEST:PROP") + 1];
   strcpy(propLine, "TEST:PROP"); // Second prop
@@ -116,20 +119,34 @@ int main(int argc, char const *argv[]) {
   a->trigger = calloc(strlen("valid") + 1, 1);
   strcpy(a->trigger, "valid"); // valid trigger
   testValidation(ca, "VALID ALARM NO PROPS", OK);
-  Property* p3 = calloc(sizeof(Property), 1); // blank property
+  Property* p3 = calloc(sizeof(Property) + 80, 1); // blank property
   insertBack(&(a->properties), p3);
   testValidation(ca, "BLANK ALARM PROP", INV_ALARM);
   strcpy(p3->propName, "VALID");
   testValidation(ca, "VALID ALARM PROP 1", OK);
   Property* p4 = extractPropertyFromLine(propLine);
+  strcpy(propLine, "TEST:PROP");
   insertBack(&(a->properties), p4);
   testValidation(ca, "VALID ALARM PROP 2", OK);
-  // TODO: ADD VALIDATION FOR iCAL PROPS
+  List calProps = initializeList(&printPropertyListFunction, &deletePropertyListFunction, &comparePropertyListFunction); // Create a list to store all properties
+  ca->properties = calProps;
+  Property* p5 = calloc(sizeof(Property) + 80, 1); // blank property
+  insertBack(&(ca->properties), p5);
+  testValidation(ca, "BLANK CAL PROP", OTHER_ERROR);
+  strcpy(p5->propName, "VALID");
+  testValidation(ca, "VALID CALENDAR PROP 1", OK);
+  strcpy(propLine, "TEST:PROP");
+  Property* p6 = extractPropertyFromLine(propLine);
+  insertBack(&(ca->properties), p6);
+  testValidation(ca, "VALID CALENDAR PROP 2", OK);
 
+  // writeCalendar("cal.ics", ca);
 
-
-
+  // char* tou = printCalendar(ca);
+  // printf("%s\n", tou);
+  // free(tou);
   deleteCalendar(ca);
+
   printf("\n");
   Calendar* c = (Calendar*)malloc(sizeof(Calendar));
   ErrorCode e = createCalendar("tests/testCalLong.ics", &c);
@@ -142,6 +159,8 @@ int main(int argc, char const *argv[]) {
   printf("%s\n", out);
   free((char*) out);
   testValidation(c, "VALID", OK);
+  writeCalendar("cal.ics", c);
+  test("cal.ics", OK);
   deleteCalendar(c);
   return 0;
 }
@@ -169,7 +188,28 @@ void test(char* fileName, ErrorCode expectedResult) {
   if (e != expectedResult) {
     printf("**FAIL**: %s %s was expected but recieved %s\n", fileName, expectedErrorText, errorText);
   } else {
-    printf("PASS: %s %s was expected\n", fileName, expectedErrorText);
+    if (e == OK) {
+      char name[100];
+      strcpy(name, "result/");
+      strcat(name, fileName);
+      ErrorCode writeErr = writeCalendar(name, c);
+      if (writeErr != OK) {
+        const char* writeErrS = printError(writeErr);
+        printf("**FAIL**: %s failed write error with error %s\n", fileName, writeErrS);
+        free((char*) writeErrS);
+      } else {
+        deleteCalendar(c);
+        c = (Calendar*)malloc(sizeof(Calendar));
+        ErrorCode valError = createCalendar(name, &c);
+        if (valError != OK) {
+          printf("**FAIL**: %s failed write error2\n", fileName);
+        } else {
+          printf("PASS: %s %s was expected and passed write error\n", fileName, expectedErrorText);
+        }
+      }
+    } else {
+      printf("PASS: %s %s was expected\n", fileName, expectedErrorText);
+    }
   }
   free((char*) expectedErrorText);
   free((char*) errorText);
