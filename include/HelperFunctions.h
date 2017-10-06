@@ -57,3 +57,4 @@ ErrorCode createEvent(List eventList, Event* event);
 */
 ErrorCode parseRequirediCalTags(List* list, Calendar* cal);
 int compareTags(const void* first, const void* second); // Predicate for comparing product tags
+int getSpaces(char* line); // Gets the number of preceeding spaces before the start of a string

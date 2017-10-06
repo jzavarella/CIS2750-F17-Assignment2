@@ -431,15 +431,6 @@ const char* printError(ErrorCode err) {
   return error;
 }
 
-int getSpaces(char* line) {
-  int count = 0;
-  char c;
-  while ((c = line[count]) == ' ') {
-    count ++;
-  }
-  return count;
-}
-
 /** Function to writing a Calendar object into a file in iCalendar format.
  *@pre Calendar object exists, is not null, and is valid
  *@post Calendar has not been modified in any way, and a file representing the
@@ -449,9 +440,13 @@ int getSpaces(char* line) {
  **/
 ErrorCode writeCalendar(char* fileName, const Calendar* obj) {
 
-  FILE* file;
-  if (!match(fileName, ".+\\.ics$") || !((file = fopen(fileName, "w+")))) { // If the file name does not match the valid ical regex or file cannot be opened
+  if (!match(fileName, ".+\\.ics$")) { // If the file name does not match the valid ical regex
     return INV_FILE;
+  }
+
+  FILE* file;
+  if (!((file = fopen(fileName, "w+")))) { // If the file cannot be opened
+    return WRITE_ERROR;
   }
 
   ErrorCode error = validateCalendar(obj); // Validate the calendar
@@ -466,25 +461,34 @@ ErrorCode writeCalendar(char* fileName, const Calendar* obj) {
     return OTHER_ERROR;
   }
 
+  // This structure acts like a sudo stack to determine which tag we should have open
   char stack[3][80];
   strcpy(stack[0], "VCALENDAR");
   strcpy(stack[1], "VEVENT");
   strcpy(stack[2], "VALARM");
 
-  int stackPointer = 0;
+  int stackPointer = 0; // This integer will point to the top of the stack
 
-  const char deliminer[2] = "\n";
-  fprintf(file, "%s%s\n", "BEGIN:", stack[stackPointer]);
+  const char deliminer[2] = "\n"; // Break the lines of the to string at newline
+
+  fprintf(file, "%s%s\n", "BEGIN:", stack[stackPointer]); // Write the begin tag which will always be BEGIN:VCALENDAR in this case
   // push stack
   stackPointer ++;
 
   char *line;
   line = strtok(string, deliminer);
-  int previousSpaces = 0;
-  int currentSpaces = 0;
+  int previousSpaces = 0; // Will hold the spaces preceeding the string on the previous line
+  int currentSpaces = 0; // Will hold the current spaces at the beginning of the line
   while(line != NULL) { // Process each line of the output
-    if (!match(line, "^-+$")) {
-      currentSpaces = getSpaces(line);
+    if (!match(line, "^-+$")) { // Dont process the caps of the string
+      currentSpaces = getSpaces(line); // Get the currentSpaces at the beginning of the line
+      /*
+        BELOW IS THE MAIN ALGORITHM
+        It essentially checks to see how many spaces at the beginning of a line and depending
+        on if the current spaces are greater than or less than the previous spaces it knows
+        whether to add a begin tag or close the previous tag. The algorithm also skips cosmetic lines in
+        the toString that should not be in the icalendar file. (ex: 'ALARM/EVENT PROPERTIES:' etc...)
+      */
       if (previousSpaces <= currentSpaces) {
         if (match(line, "CALENDAR EVENT:") || (match(line, "ALARM:"))) {
           // push the stack
@@ -497,9 +501,6 @@ ErrorCode writeCalendar(char* fileName, const Calendar* obj) {
         } else {
           size_t len = strlen(line);
           memmove(line, line+currentSpaces, len - currentSpaces + 1); // Remove spaces from the beginning of line
-          if (match(line, "^DTSTAMP")) {
-            // We need to manipu
-          }
           fprintf(file, "%s\n", line);
         }
       } else if (previousSpaces > currentSpaces) {
@@ -528,8 +529,8 @@ ErrorCode writeCalendar(char* fileName, const Calendar* obj) {
     stackPointer --;
     fprintf(file, "%s%s\n", "END:", stack[stackPointer]);
   }
-  free(string);
-  fclose(file);
+  free(string); // Free string
+  fclose(file); // Close file before returning
   return OK;
 }
 
@@ -1492,6 +1493,15 @@ int compareTags(const void* first, const void* second) {
   Property* p = (Property*) first;
   char* propName = p->propName;
   return strcmp(propName, (char*) second);
+}
+
+int getSpaces(char* line) {
+  int count = 0;
+  char c;
+  while ((c = line[count]) == ' ') {
+    count ++;
+  }
+  return count;
 }
 
 // If you made it this far, you win. Too bad the prize is nothing
