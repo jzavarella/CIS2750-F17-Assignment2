@@ -45,7 +45,6 @@ ErrorCode createCalendar(char* fileName, Calendar** obj) {
   ErrorCode lineCheckError = readLinesIntoList(fileName, &iCalPropertyList, 512); // Read the lines of the file into a list of properties
   if (lineCheckError != OK) { // If any of the lines were invalid, this will not return OK
     clearList(&iCalPropertyList); // Clear the list before returning
-    deleteCalendar(calendar);
     return lineCheckError; // Return the error that was produced
   }
 
@@ -54,7 +53,6 @@ ErrorCode createCalendar(char* fileName, Calendar** obj) {
   if (betweenVCalendarTagsError != OK) { // If there was a problem parsing
     clearList(&iCalPropertyList); // Free lists before returning
     clearList(&betweenVCalendarTags);
-    deleteCalendar(calendar);
     return betweenVCalendarTagsError; // Return the error that was produced
   }
 
@@ -70,7 +68,6 @@ ErrorCode createCalendar(char* fileName, Calendar** obj) {
       clearList(&events);
       clearList(&betweenVCalendarTags);
       clearList(&betweenVEventTags);
-      deleteCalendar(calendar);
       return eventTagsError; // Return the error that was produced
     }
     Event* event = newEmptyEvent();
@@ -82,7 +79,6 @@ ErrorCode createCalendar(char* fileName, Calendar** obj) {
       clearList(&betweenVCalendarTags);
       clearList(&betweenVEventTags);
       events.deleteData(event); // Remove the event
-      deleteCalendar(calendar);
       return eventError; // Return the error that was produced
     }
 
@@ -101,7 +97,6 @@ ErrorCode createCalendar(char* fileName, Calendar** obj) {
     clearList(&betweenVCalendarTags);
     clearList(&betweenVEventTags);
     clearList(&events);
-    deleteCalendar(calendar);
     return INV_CAL; // If there is no event, then the calendar is invalid
   }
 
@@ -112,7 +107,6 @@ ErrorCode createCalendar(char* fileName, Calendar** obj) {
     clearList(&betweenVCalendarTags);
     clearList(&betweenVEventTags);
     clearList(&events);
-    deleteCalendar(calendar);
     return iCalIdErrors; // Return the error that was produced
   }
 

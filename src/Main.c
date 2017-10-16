@@ -213,7 +213,7 @@ void test(char* fileName, ErrorCode expectedResult) {
         printf("**FAIL**: %s failed write error with error %s\n", fileName, writeErrS);
         free((char*) writeErrS);
       } else {
-        // deleteCalendar(c);
+        deleteCalendar(c);
         ErrorCode valError = createCalendar(name, &c);
         if (valError != OK) {
           printf("**FAIL**: %s failed write error2\n", fileName);
@@ -228,6 +228,6 @@ void test(char* fileName, ErrorCode expectedResult) {
   free((char*) expectedErrorText);
   free((char*) errorText);
   if (c) {
-    // deleteCalendar(c);
+    deleteCalendar(c);
   }
 }
