@@ -29,7 +29,7 @@
  *@param a double pointer to a Calendar struct that needs to be allocated
 **/
 ErrorCode createCalendar(char* fileName, Calendar** obj) {
-  *obj = malloc(sizeof(Calendar));
+  *obj = calloc(sizeof(Calendar), 1);
   Calendar* calendar = *obj;
 
   strcpy(calendar->prodID, ""); // Ensure that this field is not blank to prevent uninitialized conditional jump errors in valgrind
@@ -45,6 +45,7 @@ ErrorCode createCalendar(char* fileName, Calendar** obj) {
   ErrorCode lineCheckError = readLinesIntoList(fileName, &iCalPropertyList, 512); // Read the lines of the file into a list of properties
   if (lineCheckError != OK) { // If any of the lines were invalid, this will not return OK
     clearList(&iCalPropertyList); // Clear the list before returning
+    deleteCalendar(calendar);
     return lineCheckError; // Return the error that was produced
   }
 
@@ -53,6 +54,7 @@ ErrorCode createCalendar(char* fileName, Calendar** obj) {
   if (betweenVCalendarTagsError != OK) { // If there was a problem parsing
     clearList(&iCalPropertyList); // Free lists before returning
     clearList(&betweenVCalendarTags);
+    deleteCalendar(calendar);
     return betweenVCalendarTagsError; // Return the error that was produced
   }
 
@@ -68,6 +70,7 @@ ErrorCode createCalendar(char* fileName, Calendar** obj) {
       clearList(&events);
       clearList(&betweenVCalendarTags);
       clearList(&betweenVEventTags);
+      deleteCalendar(calendar);
       return eventTagsError; // Return the error that was produced
     }
     Event* event = newEmptyEvent();
@@ -79,6 +82,7 @@ ErrorCode createCalendar(char* fileName, Calendar** obj) {
       clearList(&betweenVCalendarTags);
       clearList(&betweenVEventTags);
       events.deleteData(event); // Remove the event
+      deleteCalendar(calendar);
       return eventError; // Return the error that was produced
     }
 
@@ -97,6 +101,7 @@ ErrorCode createCalendar(char* fileName, Calendar** obj) {
     clearList(&betweenVCalendarTags);
     clearList(&betweenVEventTags);
     clearList(&events);
+    deleteCalendar(calendar);
     return INV_CAL; // If there is no event, then the calendar is invalid
   }
 
@@ -107,6 +112,7 @@ ErrorCode createCalendar(char* fileName, Calendar** obj) {
     clearList(&betweenVCalendarTags);
     clearList(&betweenVEventTags);
     clearList(&events);
+    deleteCalendar(calendar);
     return iCalIdErrors; // Return the error that was produced
   }
 
@@ -124,7 +130,7 @@ ErrorCode createCalendar(char* fileName, Calendar** obj) {
  *@param obj - a pointer to a Calendar struct
 **/
 void deleteCalendar(Calendar* obj) {
-  if (!obj) {
+  if (obj == NULL) {
     return; // No need to be freed if the object is NULL
   }
   List events = obj->events;
@@ -637,8 +643,12 @@ int match(const char* string, char* pattern) {
   return(1);
 }
 
-int matchTEXTField(const char* propDescription) {
-  return match(propDescription, "^(;|:){0,1}[^[:cntrl:]\"\\,:;]+$"); // This regex matches valid text characters
+int matchTEXTField(const char* line) {
+  return match(line, "^(;|:){0,1}[^[:cntrl:]\"\\,:;]+$"); // This regex matches valid text lines
+}
+
+int matchDATEField(const char* line) {
+  return match(line, "^(:|;){0,1}[[:digit:]]{8}T[[:digit:]]{6}Z{0,1}$"); // This regex matches valid date lines
 }
 
 // Check if the string is allocated before freeing it
@@ -1238,9 +1248,18 @@ char* printDatePretty(DateTime dt) {
   return string;
 }
 
+int fileExists(char* file) {
+  FILE* filePointer;
+  if ((filePointer = fopen(file, "r")) != NULL) {
+    fclose(filePointer);
+    return 1;
+  }
+  return 0;
+}
+
 // Creates a time and puts it into the sent event
 ErrorCode createTime(Event* event, char* timeString) {
-  if (!timeString || !event || !match(timeString, "^(:|;){0,1}[[:digit:]]{8}T[[:digit:]]{6}Z{0,1}$")) { // If its null or doesnt match the required regex
+  if (!timeString || !event || !matchDATEField(timeString)) { // If its null or doesnt match the required regex
     return INV_CREATEDT;
   }
   char* numberDate;

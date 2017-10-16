@@ -13,18 +13,26 @@ LINKEDLISTH = include/LinkedListAPI.h
 LISTO = src/LinkedListAPI.o
 LIBLIST = bin/libllist.a
 
+UIC = src/A2main.c
+UIO = src/A2main.o
+
 INCLUDES = include/
 LIBS = -lcparse -lllist
 
 TARGET = iCalendar
+UITARGET = UI
 
 all:
 	make list
 	make parser
 	make main
+	make UI
 
 run:
 	./$(TARGET)
+
+run-ui:
+	./$(UITARGET)
 
 list: $(LINKEDLISTC) $(LINKEDLISTH)
 	$(CC) $(CFLAGS) -c $(LINKEDLISTC) -o $(LISTO) -I $(INCLUDES)
@@ -38,8 +46,13 @@ main: $(MAINC)
 	$(CC) $(CFLAGS) $(MAINC) -o $(MAINO) -c -I $(INCLUDES)
 	$(CC) $(CFLAGS) $(MAINO) -Lbin/ $(LIBS) -o $(TARGET)
 
+UI: $(UIC) $(CALENDARO) $(LISTO)
+	$(CC) $(CFLAGS) $(UIC) -o $(UIO) -c -I $(INCLUDES)
+	$(CC) $(CFLAGS) $(UIO) -Lbin/ $(LIBS) -o $(UITARGET)
+
+
 valgrind:
 	valgrind --leak-check=full ./$(TARGET)
 
 clean:
-	rm -f $(LIBLIST) $(LIBCPARSE) $(CALENDARO) $(LISTO) $(MAINO) $(TARGET)
+	rm -f $(LIBLIST) $(LIBCPARSE) $(CALENDARO) $(LISTO) $(MAINO) $(TARGET) $(UITARGET)

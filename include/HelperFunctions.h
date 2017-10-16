@@ -24,7 +24,8 @@ Alarm* createAlarmFromPropList(List props); // Creates an alarm from a list of p
 char* extractSubstringBefore(char* line, char* terminator); // returns a copy of the string up to the terminator
 char* extractSubstringAfter(char* line, char* terminator); // Returns a copy of the string after the terminator
 Property* extractPropertyFromLine(char* line); // Given a line, extract a property from it
-int matchTEXTField(const char* propDescription); // checks to see if a string matches a valid ICAL TEXT field
+int matchTEXTField(const char* line); // checks to see if a string matches a valid ICAL TEXT field
+int matchDATEField(const char* line);
 /**
   *Takes a file that has been opened and reads the lines into a linked list of chars*
   *with each node being one line of the file.
@@ -58,3 +59,4 @@ ErrorCode createEvent(List eventList, Event* event);
 ErrorCode parseRequirediCalTags(List* list, Calendar* cal);
 int compareTags(const void* first, const void* second); // Predicate for comparing product tags
 int getSpaces(char* line); // Gets the number of preceeding spaces before the start of a string
+int fileExists(char* file); // Returns 0 if the file does not exist, and 1 if it does
