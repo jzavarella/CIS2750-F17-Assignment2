@@ -2,4 +2,5 @@
 iCalendar
 .DS_Store
 iCalendar.dsYM/
+UI.dsYM/
 tests/no_permissions.ics

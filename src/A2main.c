@@ -9,7 +9,7 @@ int homeScreen(int answer);
 int newScreen(char* title, int (*handler)(int answer), size_t length, const char* option, ... );
 
 int main() {
-  newScreen("iCalendar Home", &homeScreen, 2, "Read iCalendar from file", "New Calendar Object"); // Open the home screen
+  newScreen("iCalendar Home", &homeScreen, 3, "Read iCalendar from file", "New Calendar Object", "Exit"); // Open the home screen
   return 0;
 }
 
@@ -237,13 +237,14 @@ int homeScreen(int answer) {
   switch (answer) {
     case 1:
       readFromFileScreen();
+      newScreen("iCalendar Home", &homeScreen, 3, "Read iCalendar from file", "New Calendar Object", "Exit"); // Open the home screen
       break;
     case 2:
       createCalendarObject();
+      newScreen("iCalendar Home", &homeScreen, 3, "Read iCalendar from file", "New Calendar Object", "Exit"); // Open the home screen
       break;
     case 3:
-      newScreen("Second Screen", &homeScreen, 5, "This", "is", "The", "Second", "Screen");
-      break;
+      break; // Exit the application
     default:
       printf("%d is an unimplemented screen\n", answer);
   }
