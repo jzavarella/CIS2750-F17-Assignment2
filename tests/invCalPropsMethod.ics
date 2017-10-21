@@ -11,10 +11,10 @@ ACTION:AUDIO
 TRIGGER:t
 ;com
 REPEAT:5
+someProp:anotehr frikin prop
 END:VALARM
-SUMMARY:Bastille
-  Day Party
+SUMMARY:Bastille Day Party
 END:VEVENT
 VERSION:2.0
-METHOD:skfsafklj
+MOTHID:skfsafklj
 END:VCALENDAR

@@ -3,7 +3,7 @@ PRODID:some prod id
 BEGIN:VEVENT
 UID:uid1@example.combae
 DTSTAMP:19970714T170000Z
-ORGANIZER:john.doe@example.com
+ORGANIZER:CN=John Doe:MAILTO:john.doe@example.com
 DTSTART:19970714T170000Z
 DTEND:19970715T035959Z
 BEGIN:VALARM
@@ -11,10 +11,10 @@ ACTION:AUDIO
 TRIGGER:t
 ;com
 REPEAT:5
+someProp:anotehr frikin prop
 END:VALARM
-SUMMARY:Bastille
-  Day Party
+SUMMARY:Bastille Day Party
 END:VEVENT
 VERSION:2.0
-METHOD:skfsafklj
+MOTHOD:skfsafklj
 END:VCALENDAR

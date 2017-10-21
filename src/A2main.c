@@ -54,7 +54,7 @@ void readFromFileScreen() {
   char* file;
   char buff[512];
   Calendar* c = NULL;
-  ErrorCode e = OK;
+  ICalErrorCode e = OK;
   do {
     if (e != OK) { // If there is an error, display the warning
       const char* errorText = printError(e); // Get a human readable error message
@@ -215,7 +215,7 @@ void createCalendarObject() {
 
     } while(!valid);
 
-    ErrorCode writeError = writeCalendar(userInput, c);
+    ICalErrorCode writeError = writeCalendar(userInput, c);
     if (writeError != OK) {
       const char* error = printError(writeError);
       printf("Failed to write file '%s' because of error: %s\n", userInput, error);

@@ -3,8 +3,8 @@
 #include "CalendarParser.h"
 #include "HelperFunctions.h"
 
-void test(char* fileName, ErrorCode expectedResult);
-void testValidation(Calendar* c, char* testDescription, ErrorCode expectedResult);
+void test(char* fileName, ICalErrorCode expectedResult);
+void testValidation(Calendar* c, char* testDescription, ICalErrorCode expectedResult);
 
 int main(int argc, char const *argv[]) {
 
@@ -23,6 +23,8 @@ int main(int argc, char const *argv[]) {
   test("tests/no_prod_id.ics", INV_CAL);
   test("tests/no_version.ics", INV_CAL);
   test("tests/no_event.ics", INV_CAL);
+  test("tests/invCalProps.ics", INV_CAL);
+  test("tests/invCalPropsMethod.ics", INV_CAL);
   printf("----VERSION ERRORS:\n");
   test("tests/duplicate_version.ics", DUP_VER);
   test("tests/malformed_version.ics", INV_VER);
@@ -48,9 +50,10 @@ int main(int argc, char const *argv[]) {
   test("tests/valid_no_alarm_lowercase.ics", OK);
   test("tests/testCalShort.ics", OK);
   test("tests/multiple_events.ics", OK);
-  test("tests/multiple_events_long.ics", OK);
+  test("tests/multiple_events_long.ics", INV_EVENT);
   test("tests/valid_with_newlines.ics", OK);
-  test("tests/testCalLong.ics", OK);
+  test("tests/testCalLong.ics", INV_EVENT);
+  test("tests/validCalProps.ics", OK);
   printf("\n\n------VALIDATION ERRORS:\n");
 
   Calendar* ca = NULL;
@@ -96,11 +99,12 @@ int main(int argc, char const *argv[]) {
   testValidation(ca, "BLANK PROP", INV_EVENT);
   strcpy(p->propName, ""); // invalid prop name
   testValidation(ca, "BLANK PROPNAME", INV_EVENT);
-  strcpy(p->propName, "HELLO"); // Valid prop name
-  insertBack(&(event->properties), createProperty("yo", ""));
+  strcpy(p->propName, "DTSTART"); // Valid prop name
+  clearList(&(event->properties));
+  insertBack(&(event->properties), createProperty("DTSTART", "12345678T654321"));
   testValidation(ca, "VALID EVENT NO ALARMS 1", OK);
-  char propLine[strlen("TEST:PROP") + 1];
-  strcpy(propLine, "TEST:PROP"); // Second prop
+  char propLine[strlen("GEO:-120.2;50.1") + 1];
+  strcpy(propLine, "GEO:-120.2;50.1"); // Second prop
   Property* p2 = extractPropertyFromLine(propLine);
   insertBack(&(event->properties), p2);
   printf("----ALARMS----\n");
@@ -132,74 +136,46 @@ int main(int argc, char const *argv[]) {
   ca->properties = calProps;
   Property* p5 = calloc(sizeof(Property) + 80, 1); // blank property
   insertBack(&(ca->properties), p5);
-  testValidation(ca, "BLANK CAL PROP", OTHER_ERROR);
-  strcpy(p5->propName, "VALID");
-  testValidation(ca, "VALID CALENDAR PROP 1", OK);
+  testValidation(ca, "BLANK CAL PROP", INV_CAL);
+  clearList(&(ca->properties));
   strcpy(propLine, "TEST:PROP");
   Property* p6 = extractPropertyFromLine(propLine);
   insertBack(&(ca->properties), p6);
-  testValidation(ca, "VALID CALENDAR PROP 2", OK);
+  testValidation(ca, "INVALID CALENDAR PROP 1", INV_CAL);
+  clearList(&(ca->properties));
+  strcpy(propLine, "METHOD:HOWDY");
+  p6 = extractPropertyFromLine(propLine);
+  insertBack(&(ca->properties), p6);
+  testValidation(ca, "VALID CALENDAR PROP 1", OK);
 
-  // writeCalendar("cal.ics", ca);
+  char* output = printCalendar(ca);
+  printf("%s\n", output);
+  free(output);
 
-  // char* tou = printCalendar(ca);
-  // printf("%s\n", tou);
-  // free(tou);
   deleteCalendar(ca);
-
-  printf("\n");
-  Calendar* c;
-  ErrorCode e = createCalendar("tests/testCalEvtPropAlm.ics", &c);
-
-
-  const char* errorText = printError(e);
-  printf("%s\n", errorText);
-  free((char*) errorText);
-  const char* out = printCalendar(c);
-  printf("%s\n", out);
-  free((char*) out);
-  testValidation(c, "VALID", OK);
-  writeCalendar("cal.ics", c);
-  test("cal.ics", OK);
-  deleteCalendar(c);
-
-  // Calendar* c;
-  // ErrorCode e = createCalendar("tests/testCalSimpleNoUTC.ics", &c);
-  //
-  //
-  // const char* errorText = printError(e);
-  // printf("%s\n", errorText);
-  // free((char*) errorText);
-  // const char* out = printCalendar(c);
-  // printf("%s\n", out);
-  // free((char*) out);
-  // testValidation(c, "VALID", OK);
-  // writeCalendar("cal.ics", c);
-  // test("cal.ics", OK);
-  // deleteCalendar(c);
   return 0;
 }
 
-void testValidation(Calendar* c, char* testDescription, ErrorCode expectedResult) {
-  ErrorCode e = validateCalendar(c);
-  const char* expectedErrorText = printError(expectedResult);
-  const char* errorText = printError(e);
+void testValidation(Calendar* c, char* testDescription, ICalErrorCode expectedResult) {
+  ICalErrorCode e = validateCalendar(c);
+  char* expectedErrorText = printError(expectedResult);
+  char* errorText = printError(e);
   if (e != expectedResult) {
     printf("**FAIL**: (%s) %s was expected but recieved %s\n", testDescription, expectedErrorText, errorText);
   } else {
     printf("PASS: (%s) %s was expected\n", testDescription, expectedErrorText);
   }
 
-  free((char*) expectedErrorText);
-  free((char*) errorText);
+  free(expectedErrorText);
+  free(errorText);
 }
 
-void test(char* fileName, ErrorCode expectedResult) {
+void test(char* fileName, ICalErrorCode expectedResult) {
   Calendar* c;
-  ErrorCode e = createCalendar(fileName, &c);
+  ICalErrorCode e = createCalendar(fileName, &c);
 
-  const char* expectedErrorText = printError(expectedResult);
-  const char* errorText = printError(e);
+  char* expectedErrorText = printError(expectedResult);
+  char* errorText = printError(e);
   if (e != expectedResult) {
     printf("**FAIL**: %s %s was expected but recieved %s\n", fileName, expectedErrorText, errorText);
   } else {
@@ -207,14 +183,14 @@ void test(char* fileName, ErrorCode expectedResult) {
       char name[100];
       strcpy(name, "result/");
       strcat(name, fileName);
-      ErrorCode writeErr = writeCalendar(name, c);
+      ICalErrorCode writeErr = writeCalendar(name, c);
       if (writeErr != OK) {
-        const char* writeErrS = printError(writeErr);
+        char* writeErrS = printError(writeErr);
         printf("**FAIL**: %s failed write error with error %s\n", fileName, writeErrS);
-        free((char*) writeErrS);
+        free(writeErrS);
       } else {
         deleteCalendar(c);
-        ErrorCode valError = createCalendar(name, &c);
+        ICalErrorCode valError = createCalendar(name, &c);
         if (valError != OK) {
           printf("**FAIL**: %s failed write error2\n", fileName);
         } else {
@@ -225,8 +201,8 @@ void test(char* fileName, ErrorCode expectedResult) {
       printf("PASS: %s %s was expected\n", fileName, expectedErrorText);
     }
   }
-  free((char*) expectedErrorText);
-  free((char*) errorText);
+  free(expectedErrorText);
+  free(errorText);
   if (c) {
     deleteCalendar(c);
   }

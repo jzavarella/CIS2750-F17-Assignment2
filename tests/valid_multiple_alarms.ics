@@ -11,14 +11,12 @@ ACTION:AUDIO
 TRIGGER:t
 ;com
 REPEAT:5
-someProp:anotehr frikin prop
 END:VALARM
 BEGIN:VALARM
 ACTION:AUDIO
 TRIGGER:two
 ;com
 REPEAT:5
-someProp:anotehr frikin prop
 END:VALARM
 SUMMARY:Bastille Day Party
 END:VEVENT
