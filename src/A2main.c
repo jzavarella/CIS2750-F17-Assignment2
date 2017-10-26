@@ -1,3 +1,12 @@
+/*
+ * CIS2750 F2017
+ * Assignment 2
+ * Jackson Zavarella 0929350
+ * This file is the source for a command line interface of the CalendarParser
+ * No code was used from previous classes/ sources
+ */
+
+
 #include <stdio.h>
 #include <stdarg.h>
 #include <unistd.h>
