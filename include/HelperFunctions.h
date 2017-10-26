@@ -26,6 +26,12 @@ char* extractSubstringAfter(char* line, char* terminator); // Returns a copy of 
 Property* extractPropertyFromLine(char* line); // Given a line, extract a property from it
 int matchTEXTField(const char* line); // checks to see if a string matches a valid ICAL TEXT field
 int matchDATEField(const char* line);
+int matchURIField(char* line);
+int matchTEXTListField(char* line);
+int matchLONGLATField(char* line);
+int matchDURATIONField(char* line);
+int matchEMAILField(char* line);
+int matchSUMMARYField(const char* line);
 /**
   *Takes a file that has been opened and reads the lines into a linked list of chars*
   *with each node being one line of the file.
@@ -36,12 +42,12 @@ int matchDATEField(const char* line);
   *@return: list
   * The list with each line read into it
 */
-ErrorCode readLinesIntoList(char* fileName, List* list, int bufferSize);
+ICalErrorCode readLinesIntoList(char* fileName, List* list, int bufferSize);
 // Deletes a property from a list given the string representation of it
 void deleteProperty(List* propList, char* line);
-ErrorCode extractBetweenTags(List props, List* extracted, ErrorCode onFailError, char* tag);
+ICalErrorCode extractBetweenTags(List props, List* extracted, ICalErrorCode onFailError, char* tag);
 char* printDatePretty(DateTime dt); // Prints a pretty version of a date
-ErrorCode createTime(Event* event, char* timeString); // Creates a DateTime and allocates it to the given event if the timeString can be parsed
+ICalErrorCode createTime(Event* event, char* timeString); // Creates a DateTime and allocates it to the given event if the timeString can be parsed
 void removeIntersectionOfLists(List* l1, List l2); // Removes all nodes from l1 that are found in l2
 Event* newEmptyEvent(); // Creates an empty event
 List copyPropList(List toBeCopied); // Returns a new list with the sent list's nodes copied into it
@@ -52,11 +58,11 @@ void calculateLineLength(size_t* lineLength, const char* c, ... ); // Sums the l
 /**
   *Main function to create an event
 */
-ErrorCode createEvent(List eventList, Event* event);
+ICalErrorCode createEvent(List eventList, Event* event);
 /**
   *Checks to see if the required iCalendar tags are present
 */
-ErrorCode parseRequirediCalTags(List* list, Calendar* cal);
-int compareTags(const void* first, const void* second); // Predicate for comparing product tags
+ICalErrorCode parseRequirediCalTags(List* list, Calendar* cal);
+bool compareTags(const void* first, const void* second); // Predicate for comparing product tags
 int getSpaces(char* line); // Gets the number of preceeding spaces before the start of a string
 int fileExists(char* file); // Returns 0 if the file does not exist, and 1 if it does

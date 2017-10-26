@@ -54,7 +54,7 @@ void readFromFileScreen() {
   char* file;
   char buff[512];
   Calendar* c = NULL;
-  ErrorCode e = OK;
+  ICalErrorCode e = OK;
   do {
     if (e != OK) { // If there is an error, display the warning
       const char* errorText = printError(e); // Get a human readable error message
@@ -190,6 +190,62 @@ void createCalendarObject() {
     }
   } while(!valid);
 
+  List alarms = event->alarms;
+  Alarm* alarm = calloc(sizeof(Alarm), 1);
+  alarm->properties = initializeList(&printPropertyListFunction, &deletePropertyListFunction, &comparePropertyListFunction);
+
+  do {
+    char userInput[512];
+    if (valid) {
+      printf("Enter a alarm ACTION: ");
+    } else {
+      printf("'%s' is not a valid alarm ACTION\n", userInput);
+      if (binaryOption("Enter a new alarm ACTION", "Exit") == 1) { // Offer the user the option to enter a event UID or exit
+        printf("Please enter a new ACTION: "); // Ask for new event UID
+      } else {
+        alarms.deleteData(alarm);
+        events.deleteData(event);
+        deleteCalendar(c);
+        printf("Goodbye :)\n"); // Bye :)
+        return; // Break out of this function
+      }
+    }
+    fgets(buff, sizeof(buff), stdin); // Get the user's input
+    strcpy(userInput, buff); // Copy the buffer
+    userInput[strlen(buff) - 1] = '\0'; // remove the new line char and replace it with null terminator
+    valid = match(userInput, "^(AUDIO|DISPLAY|EMAIL)$");
+    if (valid) {
+      strcpy(alarm->action, userInput);
+    }
+  } while(!valid);
+
+  do {
+    char userInput[512];
+    if (valid) {
+      printf("Enter a alarm TRIGGER: ");
+    } else {
+      printf("'%s' is not a valid alarm TRIGGER\n", userInput);
+      if (binaryOption("Enter a new alarm TRIGGER", "Exit") == 1) { // Offer the user the option to enter a event UID or exit
+        printf("Please enter a new TRIGGER: "); // Ask for new event UID
+      } else {
+        alarms.deleteData(alarm);
+        events.deleteData(event);
+        deleteCalendar(c);
+        printf("Goodbye :)\n"); // Bye :)
+        return; // Break out of this function
+      }
+    }
+    fgets(buff, sizeof(buff), stdin); // Get the user's input
+    strcpy(userInput, buff); // Copy the buffer
+    userInput[strlen(buff) - 1] = '\0'; // remove the new line char and replace it with null terminator
+    valid = matchDURATIONField(userInput);
+    if (valid) {
+      alarm->trigger = calloc(strlen(userInput) * sizeof(char) + 1, 1);
+      strcpy(alarm->trigger, userInput);
+    }
+  } while(!valid);
+  insertBack(&alarms, alarm);
+  event->alarms = alarms;
   insertBack(&events, event);
   c->events = events;
 
@@ -215,7 +271,7 @@ void createCalendarObject() {
 
     } while(!valid);
 
-    ErrorCode writeError = writeCalendar(userInput, c);
+    ICalErrorCode writeError = writeCalendar(userInput, c);
     if (writeError != OK) {
       const char* error = printError(writeError);
       printf("Failed to write file '%s' because of error: %s\n", userInput, error);

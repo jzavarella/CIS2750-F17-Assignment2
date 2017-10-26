@@ -332,7 +332,7 @@ int getLength(List list) {
  *@param list - a list sruct
  *@param compare - a pointer to comparator fuction for customizing the search
  **/
-void* findElement(List list, int (*compare)(const void* first,const void* second), const void* search) {
+void* findElement(List list, bool (*compare)(const void* first,const void* second), const void* search) {
   ListIterator iter = createIterator(list);
   void* element;
   while ((element = nextElement(&iter))) { // Iterate over the list
