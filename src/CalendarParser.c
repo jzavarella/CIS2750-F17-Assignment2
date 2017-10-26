@@ -48,6 +48,7 @@ ICalErrorCode createCalendar(char* fileName, Calendar** obj) {
     return lineCheckError; // Return the error that was produced
   }
 
+
   // Get the properties between event tags
   ICalErrorCode betweenVCalendarTagsError = extractBetweenTags(iCalPropertyList, &betweenVCalendarTags, INV_CAL, "VCALENDAR");
   if (betweenVCalendarTagsError != OK) { // If there was a problem parsing
@@ -564,7 +565,7 @@ ICalErrorCode validateEventProps(const Calendar* obj, Event* event) {
       continue;
     } else if (match(propName, "^COMMENT$") && matchTEXTField(propDescr)) {
       continue;
-    } else if (match(propName, "^DESCRIPTION$") && matchTEXTField(propDescr) && getPropCount("DESCRIPTION", event->properties) <= 1) {
+    } else if (match(propName, "^DESCRIPTION$") && matchSUMMARYField(propDescr) && getPropCount("DESCRIPTION", event->properties) <= 1) {
       continue;
     } else if (match(propName, "^GEO$") && matchLONGLATField(propDescr)) {
       continue;
@@ -576,7 +577,7 @@ ICalErrorCode validateEventProps(const Calendar* obj, Event* event) {
       continue;
     } else if (match(propName, "^STATUS$") && match(propDescr, "^(TENTATIVE|CONFIRMED|CANCELLED)$") && getPropCount("STATUS", event->properties) <= 1) {
       continue;
-    } else if (match(propName, "^SUMMARY$") && matchTEXTField(propDescr)) {
+    } else if (match(propName, "^SUMMARY$") && matchSUMMARYField(propDescr)) {
       continue;
     } else if (match(propName, "^DTEND$") && matchDATEField(propDescr) && getPropCount("DTSTART", event->properties) == 1) { // DTEND requires that we have a start
       continue;
@@ -602,7 +603,14 @@ ICalErrorCode validateEventProps(const Calendar* obj, Event* event) {
       continue;
     } else if (match(propName, "^RRULE") && matchTEXTField(propDescr) && getPropCount("RRULE", event->properties) <= 1) {
       continue;
+    } else if (match(propName, "CREATED") && matchDATEField(propDescr) && getPropCount("CREATED", event->properties) <= 1) {
+     continue;
+    } else if (match(propName, "LAST-MODIFIED") && matchDATEField(propDescr)) {
+     continue;
+   } else if (match(propName, "SEQUENCE") && match(propDescr, "^[[:digit:]]$")) {
+     continue;
     } else {
+      // printf("INV EVENT: %s %s\n", propName, propDescr);
       return INV_EVENT;
     }
   }
@@ -623,11 +631,12 @@ ICalErrorCode validateAlarmProps(const Calendar* obj, Event* event, Alarm* alarm
       continue;
     } else if (match(propName, "^DURATION$") && matchDURATIONField(propDescr)) {
       continue;
-    } else if (match(propName, "^DESCRIPTION$") && matchTEXTField(propDescr) && getPropCount("DESCRIPTION", alarm->properties) <= 1) {
+    } else if (match(propName, "^DESCRIPTION$") && matchSUMMARYField(propDescr) && getPropCount("DESCRIPTION", alarm->properties) <= 1) {
       continue;
     } else if (match(propName, "^SUMMARY$") && matchTEXTField(propDescr)) {
       continue;
     } else {
+      // printf("INV ALARM: %s %s\n", propName, propDescr);
       return INV_ALARM;
     }
   }
@@ -647,6 +656,7 @@ ICalErrorCode validateCalProps(const Calendar* obj) {
     } else if (match(propName, "^METHOD$") && matchTEXTField(propDescr) && getPropCount("METHOD", obj->properties) <= 1) {
       continue;
     } else {
+      // printf("INV CAL: %s %s\n", propName, propDescr);
       return INV_CAL;
     }
   }
@@ -754,12 +764,16 @@ int matchTEXTField(const char* line) {
   return match(line, "^(;|:){0,1}[^[:cntrl:]\"\\,:;]+$"); // This regex matches valid text lines
 }
 
+int matchSUMMARYField(const char* line) {
+  return match(line, "[^[:cntrl:]\"\\:;]+$"); // This regex matches valid text lines
+}
+
 int matchDATEField(const char* line) {
-  return match(line, "^(:|;){0,1}[[:digit:]]{8}T[[:digit:]]{6}Z{0,1}$"); // This regex matches valid date lines
+  return match(line, "(:|;){0,1}[[:digit:]]{8}T[[:digit:]]{6}Z{0,1}$"); // This regex matches valid date lines
 }
 
 int matchURIField(char* line) { //~~~~~~~~Scheme~~~//~AUTHORTY~~~~~~~~~~~~~~~~URL~~~~~~~~~~.extension~~~~~~~~~or~~IP Address~~~~~~~~~~~~~~~~~~~~~~~~~~Port~~~~~~~~~~~~~~~~PATH~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~File extension
-  return match(line, "^[[:alpha:]][[:alnum:]+-:\\.]*//([[:alnum:]]+:.+@){0,1}([[:alnum:]]+(\\.[[:alpha:]]+){0,1}|[[:digit:]]{1,3}(\\.[[:digit:]]+){3,})(:[[:digit:]]+){0,1}(/([[:alnum:]]+/{0,1})+){0,1}(\\.[[:alnum:]]+)*$");
+  return match(line, "[[:alpha:]][[:alnum:]+-:\\.]*//([[:alnum:]]+:.+@){0,1}([[:alnum:]]+(\\.[[:alpha:]]+){0,1}|[[:digit:]]{1,3}(\\.[[:digit:]]+){3,})(:[[:digit:]]+){0,1}(/([[:alnum:]-]+/{0,1})+){0,1}(\\.[[:alnum:]]+)*$");
 }
 
 int matchTEXTListField(char* line) {
@@ -778,10 +792,10 @@ int matchDURATIONField(char* line) {
   // Second: [[:digit:]]+S
   // minute: [[:digit:]]+M([[:digit:]]+S){0,1}
   // hour: [[:digit:]]+H([[:digit:]]+M([[:digit:]]+S){0,1}){0,1}
-  // time: ([[:digit:]]+H([[:digit:]]+M([[:digit:]]+S){0,1}){0,1}|[[:digit:]]+M([[:digit:]]+S){0,1}|[[:digit:]]+S)
+  // time: (T[[:digit:]]+H([[:digit:]]+M([[:digit:]]+S){0,1}){0,1}|T[[:digit:]]+M([[:digit:]]+S){0,1}|T[[:digit:]]+S)
   // day: [[:digit:]]+D
-  // date: [[:digit:]]+D(([[:digit:]]+H([[:digit:]]+M([[:digit:]]+S){0,1}){0,1}|[[:digit:]]+M([[:digit:]]+S){0,1}|[[:digit:]]+S)){0,1}
-  return match(line, "^[\\+-]{0,1}P([[:digit:]]+D(([[:digit:]]+H([[:digit:]]+M([[:digit:]]+S){0,1}){0,1}|[[:digit:]]+M([[:digit:]]+S){0,1}|[[:digit:]]+S)){0,1}|([[:digit:]]+H([[:digit:]]+M([[:digit:]]+S){0,1}){0,1}|[[:digit:]]+M([[:digit:]]+S){0,1}|[[:digit:]]+S)|[[:digit:]]+W)$");
+  // date: [[:digit:]]+D((T[[:digit:]]+H([[:digit:]]+M([[:digit:]]+S){0,1}){0,1}|T[[:digit:]]+M([[:digit:]]+S){0,1}|T[[:digit:]]+S)){0,1}
+  return match(line, "([\\+-]{0,1}P([[:digit:]]+D((T[[:digit:]]+H([[:digit:]]+M([[:digit:]]+S){0,1}){0,1}|T[[:digit:]]+M([[:digit:]]+S){0,1}|T[[:digit:]]+S)){0,1}|(T[[:digit:]]+H([[:digit:]]+M([[:digit:]]+S){0,1}){0,1}|T[[:digit:]]+M([[:digit:]]+S){0,1}|T[[:digit:]]+S)|[[:digit:]]+W)|(:|;){0,1}[[:digit:]]{8}T[[:digit:]]{6}Z{0,1})$");
 }
 
 // Check if the string is allocated before freeing it
@@ -1073,7 +1087,7 @@ Alarm* createAlarm(char* action, char* trigger, List properties) {
   if (!action || !trigger) {
     return NULL; // If the action or trigger is null then nothing can save you
   }
-  Alarm* alarm = malloc(sizeof(Alarm));
+  Alarm* alarm = calloc(sizeof(Alarm), 1);
   if (action[0] == ':' || action[0] == ';') { // Remove the beginning ; or : if it exists
     memmove(action, action + 1, strlen(action));
   }
@@ -1126,21 +1140,14 @@ Alarm* createAlarmFromPropList(List props) {
       strcpy(ACTION, tempDescription);
 
     } else if (match(propName, "^TRIGGER$")) {
-      if (TRIGGER) {
+      if (TRIGGER || !matchDURATIONField(propDescr)) {
         clearList(&alarmProps);
+        // printf("%s\n", propDescr);
         return NULL; // Already have trigger
       } else {
         TRIGGER = malloc(strlen(tempDescription) + 1);
         strcpy(TRIGGER, tempDescription);
       }
-    } else if (match(propName, "^REPEAT$")) {
-      if (!match(tempDescription, "^[[:digit:]]+$")) {
-        printf("td: %s\n", tempDescription);
-        clearList(&alarmProps);
-        return NULL; // Repeat must be an integer
-      }
-      Property* p = createProperty(propName, propDescr);
-      insertBack(&alarmProps, p);
     } else {
       Property* p = createProperty(propName, propDescr);
       insertBack(&alarmProps, p);
@@ -1212,8 +1219,12 @@ Property* extractPropertyFromLine(char* line) {
   }
   // descriptionLength += 1; // strtok removes the ';'
   char propDescr[descriptionLength + 1];
-  size_t substring = lineLength - descriptionLength + 1;
-  memcpy(propDescr, tempLine + substring, descriptionLength);
+  size_t substring = lineLength - descriptionLength;
+  if (match(&tempLine[substring], "^(;|:)")) {
+    memcpy(propDescr, tempLine + substring + 1, descriptionLength);
+  } else {
+    memcpy(propDescr, tempLine + substring, descriptionLength);
+  }
   propDescr[descriptionLength] = '\0';
   Property* p = createProperty(propName, propDescr);
   return p;
@@ -1240,6 +1251,37 @@ ICalErrorCode readLinesIntoList(char* fileName, List* list, int bufferSize) {
   char * line = NULL;
   size_t len = 0;
   ssize_t read;
+  char prevLine[bufferSize * 10];
+  strcpy(prevLine, "");
+  FILE* tempFile = fopen("temp.ics", "w+");
+
+  while ((read = getline(&line, &len, file)) != -1) {
+    if (match(line, "^;.*\n\r$")) { // Line ending
+      continue;
+    }
+    if (match(line, "^[[:blank:]]+.+")) { // if this line starts with a space or tab and isnt blank
+      if (prevLine[strlen(prevLine) - 1] == '\n') { // Remove new line from end of line
+        if ((int)strlen(prevLine) - 2 >= 0 && prevLine[strlen(prevLine) - 2] == '\r') { // Remove carriage return if it exists
+          prevLine[strlen(prevLine) - 2] = '\0';
+        }
+      }
+      memmove(line, line + 1, strlen(line)); // Shift the contents of the string right by one as to not include the space
+      strcat(prevLine, line);
+      continue;
+    }
+
+    // write line
+    fputs(prevLine, tempFile);
+    strcpy(prevLine, line);
+  }
+  fputs(prevLine, tempFile);
+  safelyFreeString(line);
+  fclose(tempFile);
+
+  file = fopen("temp.ics", "r");
+
+  line = NULL;
+  len = 0;
 
   while ((read = getline(&line, &len, file)) != -1) {
     if (match(line, "^;")) {
@@ -1264,15 +1306,18 @@ ICalErrorCode readLinesIntoList(char* fileName, List* list, int bufferSize) {
         }
       }
       memmove(line, line + 1, strlen(line)); // Shift the contents of the string right by one as to not include the space
-      size_t currentSize = sizeof(*p) + strlen(p->propDescr)*sizeof(char); // Calculatethe current size of the property
+      size_t currentSize = sizeof(*p) + strlen(p->propDescr)*sizeof(char) + 1; // Calculatethe current size of the property
       size_t newSize = currentSize + strlen(line)*sizeof(char); // Calculate how much memory we need for the new property
-      tailNode->data = realloc(p, newSize + 1); // Reallocate memory for the new property
       p = (Property*) tailNode->data;
+      // tailNode->data = realloc(p, newSize + 1); // Reallocate memory for the new property
+      p = realloc(p, newSize + 1); // Reallocate memory for new property
       strcat(p->propDescr, line); // Concat this line onto the property description
 
+      tailNode->data = p;
+      list->tail = tailNode;
       continue; // Continue to the next line
     }
-    if (match(line, "^[a-zA-Z\\-]*(:|;).*(\r\n){0,1}$")) {
+    if (match(line, "(\r\n){0,1}$")) {
       if (line[strlen(line) - 1] == '\n') { // Remove new line from end of line
         if ((int)strlen(line) - 2 >= 0 && line[strlen(line) - 2] == '\r') { // Remove carriage return if it exists
           line[strlen(line) - 2] = '\0';
@@ -1282,17 +1327,30 @@ ICalErrorCode readLinesIntoList(char* fileName, List* list, int bufferSize) {
           return INV_FILE;
         }
       }
+    }
+    if (match(line, "^[a-zA-Z\\-]*(:|;).*$")) {
       Property* p = extractPropertyFromLine(line);
       insertBack(list, p); // Insert the property into the list
     } else {
       safelyFreeString(line);
       fclose(file);
       return INV_CAL;
+      // if (line[strlen(line) - 1] == '\n') { // Remove new line from end of line
+      //   if ((int)strlen(line) - 2 >= 0 && line[strlen(line) - 2] == '\r') { // Remove carriage return if it exists
+      //     line[strlen(line) - 2] = '\0';
+      //   } else {
+      //     safelyFreeString(line);
+      //     fclose(file);
+      //     return INV_FILE;
+      //   }
+      // }
+      // Property* p = createProperty(line, "");
+      // insertBack(list, p); // Insert the property into the list
     }
   }
+  remove("temp.ics");
   safelyFreeString(line);
   fclose(file);
-
   if (!list->head) {
     return INV_CAL; // If the file was empty
   }
@@ -1605,6 +1663,7 @@ ICalErrorCode parseRequirediCalTags(List* list, Calendar* cal) {
   if (!VERSION || !PRODID) {
     safelyFreeString(PRODID); // PROD might be allocated so we must remove it before returning
     safelyFreeString(VERSION); // Version might be allocated so we must remove it before returning
+
     return INV_CAL; // We are missing required tags
   }
 
@@ -1661,10 +1720,13 @@ void concatenateLine(char* string, const char* c, ... ) {
    va_end(valist);
 }
 
-int compareTags(const void* first, const void* second) {
+bool compareTags(const void* first, const void* second) {
   Property* p = (Property*) first;
   char* propName = p->propName;
-  return strcmp(propName, (char*) second);
+  if (strcmp(propName, (char*) second) == 0) {
+    return true;
+  }
+  return false;
 }
 
 int getSpaces(char* line) {

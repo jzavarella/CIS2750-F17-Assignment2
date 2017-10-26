@@ -31,6 +31,7 @@ int matchTEXTListField(char* line);
 int matchLONGLATField(char* line);
 int matchDURATIONField(char* line);
 int matchEMAILField(char* line);
+int matchSUMMARYField(const char* line);
 /**
   *Takes a file that has been opened and reads the lines into a linked list of chars*
   *with each node being one line of the file.
@@ -62,6 +63,6 @@ ICalErrorCode createEvent(List eventList, Event* event);
   *Checks to see if the required iCalendar tags are present
 */
 ICalErrorCode parseRequirediCalTags(List* list, Calendar* cal);
-int compareTags(const void* first, const void* second); // Predicate for comparing product tags
+bool compareTags(const void* first, const void* second); // Predicate for comparing product tags
 int getSpaces(char* line); // Gets the number of preceeding spaces before the start of a string
 int fileExists(char* file); // Returns 0 if the file does not exist, and 1 if it does
