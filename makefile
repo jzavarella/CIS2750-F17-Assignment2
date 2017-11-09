@@ -24,6 +24,10 @@ all:
 	make parser
 	make UI
 
+so:
+	$(CC) $(CFLAGS) -fPIC -c $(LINKEDLISTC) -o $(LISTO) -I $(INCLUDES)
+	$(CC) $(LISTO) -shared -o listlib.so
+
 list: $(LINKEDLISTC) $(LINKEDLISTH)
 	$(CC) $(CFLAGS) -c $(LINKEDLISTC) -o $(LISTO) -I $(INCLUDES)
 	ar cr $(LIBLIST) $(LISTO)
