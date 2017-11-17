@@ -1,6 +1,6 @@
 /*
  * CIS2750 F2017
- * Assignment 2
+ * Assignment 3
  * Jackson Zavarella 0929350
  * This file parses iCalendar Files
  * No code was used from previous classes/ sources
@@ -15,6 +15,199 @@
 #include "CalendarParser.h"
 #include "HelperFunctions.h"
 
+void addEventPython(Calendar* c, char* uid, char* date, char* start) {
+  if (!c || !uid || !date || !start) {
+    return;
+  }
+
+  Event* event = newEmptyEvent();
+  strcpy(event->UID, uid);
+  createDateTime(event, date);
+  createStartTime(event, start);
+  insertBack(&c->events, event);
+}
+
+void* createBasicCalendarPython(float version, char* prodId) {
+  if (!prodId) {
+    return NULL;
+  }
+  Calendar* c = calloc(sizeof(Calendar), 1);
+
+  c->version = version;
+  strcpy(c->prodID, prodId);
+
+  List events = initializeList(&printEventListFunction, &deleteEventListFunction, &compareEventListFunction);
+  c->events = events;
+
+  List props = initializeList(&printPropertyListFunction, &deletePropertyListFunction, &comparePropertyListFunction); // Create a list to store all properties/ lines
+  c->properties = props;
+
+  return c;
+
+}
+
+void* openCalendarPython(char* fileName) {
+  Calendar* c = calloc(sizeof(Calendar), 1);
+  ICalErrorCode e = createCalendar(fileName, &c);
+  if (e != OK) {
+    return NULL;
+  }
+  return c;
+}
+
+int validateVersionPython(char* version) {
+  if (!version || !match(version, "^[[:digit:]]+(\\.[[:digit:]]+)*$")) {
+    return 0;
+  }
+  return 1;
+}
+
+ICalErrorCode validateCalendarPython(char* fileName) {
+  Calendar* c = calloc(sizeof(Calendar), 1);
+  ICalErrorCode e = createCalendar(fileName, &c);
+  deleteCalendar(c);
+  return e;
+}
+
+char* getComponentAlarmsPython(Calendar* c, int compNum) {
+  if (!c) {
+    return NULL;
+  }
+
+  ListIterator events = createIterator(c->events);
+  Event* event;
+  for (size_t i = 0; i < compNum; i++) {
+    event = nextElement(&events);
+  }
+  if (!event) {
+    return NULL; // There is not component at compNum
+  }
+  ListIterator alarms = createIterator(event->alarms);
+  Alarm* a;
+  int n = getLength(event->alarms); // The number of properties in the list
+  int i = 0;
+  size_t strlength = 0;
+  while ((a = nextElement(&alarms))) {
+    char* temp = printAlarmListFunction(a);
+    strlength += strlen(temp);
+    free(temp);
+    if (i < n - 1) {
+      strlength += strlen("\n"); // Only put the new line char if this element is not the last element
+    }
+    i ++; // Increment
+  }
+
+  strlength ++;
+  char* final = calloc(strlength + 1, 1);
+  strcpy(final, "");
+  i = 0; // Reset the counter
+  alarms = createIterator(event->alarms);
+  while ((a = nextElement(&alarms))) {
+    char* temp = printAlarmListFunction(a);
+    strcat(final, temp);
+    free(temp);
+    if (i < n - 1) {
+      strcat(final, "\n");
+    }
+    i ++; // Increment
+  }
+
+  return final;
+}
+
+char* getComponentPropsPython(Calendar* c, int compNum) {
+  if (!c) {
+    return NULL;
+  }
+
+  ListIterator events = createIterator(c->events);
+  Event* event;
+  for (size_t i = 0; i < compNum; i++) {
+    event = nextElement(&events);
+  }
+  if (!event) {
+    return NULL; // There is not component at compNum
+  }
+  ListIterator props = createIterator(event->properties);
+  Property* p;
+  int n = getLength(event->properties); // The number of properties in the list
+  int i = 0;
+  size_t strlength = 0;
+  while ((p = nextElement(&props))) {
+    char* temp = printPropertyListFunction(p);
+    strlength += strlen(temp);
+    free(temp);
+    if (i < n - 1) {
+      strlength += strlen("\n"); // Only put the new line char if this element is not the last element
+    }
+    i ++; // Increment
+  }
+
+  strlength ++;
+  char* final = calloc(strlength + 1, 1);
+  strcpy(final, "");
+  i = 0; // Reset the counter
+  props = createIterator(event->properties);
+  while ((p = nextElement(&props))) {
+    char* temp = printPropertyListFunction(p);
+    strcat(final, temp);
+    free(temp);
+    if (i < n - 1) {
+      strcat(final, "\n");
+    }
+    i ++; // Increment
+  }
+
+  return final;
+}
+
+char* getCalendarComponentsPython(Calendar* c) {
+  if (!c) {
+    return NULL;
+  }
+
+  ListIterator events = createIterator(c->events);
+  Event* event;
+  int components = 0;
+  size_t strlength = 0;
+  while ((event = nextElement(&events))) { // Loop over all events
+    components ++; // Increment number of components
+    int propNumber = getLength(event->properties) + 3; // +3 for the three required props
+    int alarmNumber = getLength(event->alarms);
+    strlength += snprintf(NULL, 0, "%d", propNumber);
+    strlength += strlen("\\\""); // Deliminate the elements with a string of illegal characters fro ical file
+    strlength += snprintf(NULL, 0, "%d", alarmNumber);
+    Property* summary;
+    strlength += strlen("\\\"");
+    if ((summary = findElement(event->properties, &compareTags, "SUMMARY"))) {
+      strlength += strlen(summary->propDescr);
+    }
+    strlength += strlen("\"\\");
+  }
+  strlength ++; // Make room for null terminator
+
+  char* final = calloc(strlength + 1, 1);
+  strcpy(final, "");
+  events = createIterator(c->events);
+  while ((event = nextElement(&events))) { // Loop over all events
+    components ++; // Increment number of components
+    int propNumber = getLength(event->properties) + 3; // +3 for the three required props
+    int alarmNumber = getLength(event->alarms);
+    char temp[100];
+    sprintf(temp, "%d", propNumber);
+    strcat(final, temp);
+    strcat(final, "\\\"");
+    sprintf(temp, "%d", alarmNumber);
+    strcat(final, temp);
+    Property* summary;
+    strcat(final, "\\\"");
+    if ((summary = findElement(event->properties, &compareTags, "SUMMARY"))) {
+      strcat(final, summary->propDescr);
+    }
+    strcat(final, "\"\\");
+  }
+  return final;
+}
 
 /** Function to create a Calendar object based on the contents of an iCalendar file.
  *@pre File name cannot be an empty string or NULL.  File name must have the .ics extension.
@@ -40,14 +233,12 @@ ICalErrorCode createCalendar(char* fileName, Calendar** obj) {
   // List to store calendar properties
   List betweenVCalendarTags = initializeList(&printPropertyListFunction, &deletePropertyListFunction, &comparePropertyListFunction);
   calendar->properties = betweenVCalendarTags;
-
   List iCalPropertyList = initializeList(&printPropertyListFunction, &deletePropertyListFunction, &comparePropertyListFunction); // Create a list to store all properties/ lines
   ICalErrorCode lineCheckError = readLinesIntoList(fileName, &iCalPropertyList, 512); // Read the lines of the file into a list of properties
   if (lineCheckError != OK) { // If any of the lines were invalid, this will not return OK
     clearList(&iCalPropertyList); // Clear the list before returning
     return lineCheckError; // Return the error that was produced
   }
-
 
   // Get the properties between event tags
   ICalErrorCode betweenVCalendarTagsError = extractBetweenTags(iCalPropertyList, &betweenVCalendarTags, INV_CAL, "VCALENDAR");
@@ -57,14 +248,25 @@ ICalErrorCode createCalendar(char* fileName, Calendar** obj) {
     return betweenVCalendarTagsError; // Return the error that was produced
   }
 
+
+  // // We should only have VERSION and PRODID now
+  ICalErrorCode iCalIdErrors = parseRequirediCalTags(&betweenVCalendarTags, *obj); // Place UID and version in the obj
+  if (iCalIdErrors != OK) { // If there was a problem
+    clearList(&iCalPropertyList); // Clear lists before returning
+    clearList(&betweenVCalendarTags);
+    clearList(&events);
+    return iCalIdErrors; // Return the error that was produced
+  }
+
+
   // List to store event properties
   List betweenVEventTags = initializeList(&printPropertyListFunction, &deletePropertyListFunction, &comparePropertyListFunction);
 
   ICalErrorCode eventTagsError;
-  // While we still have VALARM tags
-  while ((eventTagsError = extractBetweenTags(betweenVCalendarTags, &betweenVEventTags, INV_EVENT, "VEVENT")) != INV_EVENT) {
+  // While we still have VEVENT tags
+  while ((eventTagsError = extractBetweenTags(betweenVCalendarTags, &betweenVEventTags, INV_EVENT, "VEVENT")) != OTHER_ERROR) {
     // If there is an event, check the event error
-    if (eventTagsError != OK) {
+    if (eventTagsError == INV_EVENT) {
       clearList(&iCalPropertyList); // Clear lists before returning
       clearList(&events);
       clearList(&betweenVCalendarTags);
@@ -99,16 +301,6 @@ ICalErrorCode createCalendar(char* fileName, Calendar** obj) {
     clearList(&betweenVEventTags);
     clearList(&events);
     return INV_CAL; // If there is no event, then the calendar is invalid
-  }
-
-  // // We should only have VERSION and PRODID now
-  ICalErrorCode iCalIdErrors = parseRequirediCalTags(&betweenVCalendarTags, *obj); // Place UID and version in the obj
-  if (iCalIdErrors != OK) { // If there was a problem
-    clearList(&iCalPropertyList); // Clear lists before returning
-    clearList(&betweenVCalendarTags);
-    clearList(&betweenVEventTags);
-    clearList(&events);
-    return iCalIdErrors; // Return the error that was produced
   }
 
   clearList(&iCalPropertyList); // Clear lists before returning
@@ -196,6 +388,14 @@ char* printCalendar(const Calendar* obj) {
     calculateLineLength(&lineLength, "  DTSTAMP:", dtString, "\n" , NULL); // Add the length of these strings to the lineLength
     safelyFreeString(dtString);
     updateLongestLineAndIncrementStringSize(&longestLine, &lineLength, &stringSize); // Update the variable that stores the line with the greatest length
+
+    // CREATION TIMESTAMP: some time\n
+    char* startString = printDatePretty(event->startDateTime);
+    if (strcmp(startString, "T") != 0) {
+      calculateLineLength(&lineLength, "  DTSTART:", startString, "\n" , NULL); // Add the length of these strings to the lineLength
+      updateLongestLineAndIncrementStringSize(&longestLine, &lineLength, &stringSize); // Update the variable that stores the line with the greatest length
+    }
+    safelyFreeString(startString);
 
     List alarms = event->alarms;
     if (alarms.head) {
@@ -304,6 +504,12 @@ char* printCalendar(const Calendar* obj) {
     char* dtString = printDatePretty(event->creationDateTime);
     concatenateLine(string, "  DTSTAMP:", dtString, "\n", NULL);
     safelyFreeString(dtString);
+
+    char* dtStart = printDatePretty(event->startDateTime);
+    if (strcmp(dtStart, "T") != 0) {
+      concatenateLine(string, "  DTSTART:", dtStart, "\n", NULL);
+    }
+    safelyFreeString(dtStart);
 
     List alarms = event->alarms;
     if (alarms.head) {
@@ -456,12 +662,14 @@ ICalErrorCode writeCalendar(char* fileName, const Calendar* obj) {
   ICalErrorCode error = validateCalendar(obj); // Validate the calendar
   if (error != OK) {
     fclose(file); // close the file before returning
+    remove(fileName);
     return error;
   }
 
   char* string = printCalendar(obj);
   if (!string) { // If we couldnt parse the calendar into a string
     fclose(file); // close the file before returning
+    remove(fileName);
     return OTHER_ERROR;
   }
 
@@ -556,58 +764,58 @@ ICalErrorCode validateEventProps(const Calendar* obj, Event* event) {
 
   while ((prop = nextElement(&eventPropIter))) {
     char* propName = prop->propName;
-    char* propDescr = prop->propDescr;
-    if (match(propName, "^ATTACH$") && matchURIField(propDescr)) {
+    // char* propDescr = prop->propDescr;
+    if (match(propName, "^ATTACH$")) { // && matchURIField(propDescr)
       continue;
-    } else if (match(propName, "^CATEGORIES$") && matchTEXTListField(propDescr)) {
+    } else if (match(propName, "^CATEGORIES$")) { // && matchTEXTListField(propDescr)
       continue;
-    } else if (match(propName, "^CLASS$") && match(propDescr, "^(PUBLIC|PRIVATE|CONFIDENTIAL)$")) {
+    } else if (match(propName, "^CLASS$")) { // && match(propDescr, "^(PUBLIC|PRIVATE|CONFIDENTIAL)$")
       continue;
-    } else if (match(propName, "^COMMENT$") && matchTEXTField(propDescr)) {
+    } else if (match(propName, "^COMMENT$")) { // && matchTEXTField(propDescr)
       continue;
-    } else if (match(propName, "^DESCRIPTION$") && matchSUMMARYField(propDescr) && getPropCount("DESCRIPTION", event->properties) <= 1) {
+    } else if (match(propName, "^DESCRIPTION$")&& getPropCount("DESCRIPTION", event->properties) <= 1) { //  && matchSUMMARYField(propDescr)
       continue;
-    } else if (match(propName, "^GEO$") && matchLONGLATField(propDescr)) {
+    } else if (match(propName, "^GEO$")) { //  && matchLONGLATField(propDescr)
       continue;
-    } else if (match(propName, "^LOCATION$") && matchTEXTField(propDescr)) {
+    } else if (match(propName, "^LOCATION$")) { // && matchTEXTField(propDescr)
       continue;
-    } else if (match(propName, "^PRIORITY$") && match(propDescr, "^[[:digit:]]$")) {
+    } else if (match(propName, "^PRIORITY$")) { // && match(propDescr, "^[[:digit:]]$")
       continue;
-    } else if (match(propName, "^RESOURCES$") && matchTEXTListField(propDescr) && getPropCount("RESOURCES", event->properties) <= 1) {
+    } else if (match(propName, "^RESOURCES$") && getPropCount("RESOURCES", event->properties) <= 1) { //  && matchTEXTListField(propDescr)
       continue;
-    } else if (match(propName, "^STATUS$") && match(propDescr, "^(TENTATIVE|CONFIRMED|CANCELLED)$") && getPropCount("STATUS", event->properties) <= 1) {
+    } else if (match(propName, "^STATUS$") && getPropCount("STATUS", event->properties) <= 1) { //  && match(propDescr, "^(TENTATIVE|CONFIRMED|CANCELLED)$")
       continue;
-    } else if (match(propName, "^SUMMARY$") && matchSUMMARYField(propDescr)) {
+    } else if (match(propName, "^SUMMARY$")) { //  && matchSUMMARYField(propDescr)
       continue;
-    } else if (match(propName, "^DTEND$") && matchDATEField(propDescr) && getPropCount("DTSTART", event->properties) == 1) { // DTEND requires that we have a start
+    } else if (match(propName, "^DTSTART$") && getPropCount("DTSTART", event->properties) <= 1) { // DTEND requires that we have a start  && matchDATEField(propDescr)
       continue;
-    } else if (match(propName, "^DTSTART$") && matchDATEField(propDescr) && getPropCount("DTSTART", event->properties) <= 1) {
+    } else if (match(propName, "^DTEND$") && getPropCount("DTEND", event->properties) <= 1 && getPropCount("DURATION", event->properties) < 1) { // DTEND requires that we have a start  && matchDATEField(propDescr)
       continue;
-    } else if (match(propName, "^DURATION$") && matchDURATIONField(propDescr)) {
+    } else if (match(propName, "^DURATION$") && getPropCount("DTEND", event->properties) < 1) { //  && matchDURATIONField(propDescr)
       continue;
-    } else if (match(propName, "^TRANSP$") && match(propDescr, "^(OPAQUE|TRANSPARENT)$") && getPropCount("TRANSP", event->properties) <= 1) {
+    } else if (match(propName, "^TRANSP$") && getPropCount("TRANSP", event->properties) <= 1) { //  && match(propDescr, "^(OPAQUE|TRANSPARENT)$")
       continue;
-    } else if (match(propName, "^ATENDEE$") && matchTEXTField(propDescr)) {
+    } else if (match(propName, "^ATENDEE$")) { //  && matchTEXTField(propDescr)
       continue;
-    } else if (match(propName, "^CONTACT$") && matchTEXTField(propDescr)) {
+    } else if (match(propName, "^CONTACT$")) { //  && matchTEXTField(propDescr)
       continue;
-    } else if (match(propName, "^ORGANIZER$") && matchEMAILField(propDescr)) {
+    } else if (match(propName, "^ORGANIZER$")) { //  && matchEMAILField(propDescr)
       continue;
-    } else if (match(propName, "^RELATED-TO$") && matchTEXTField(propDescr)) {
+    } else if (match(propName, "^RELATED-TO$")) { // && matchTEXTField(propDescr)
       continue;
-    } else if (match(propName, "^URL$") && matchURIField(propDescr) && getPropCount("URL", event->properties) <= 1) {
+    } else if (match(propName, "^URL$") && getPropCount("URL", event->properties) <= 1) { //  && matchURIField(propDescr)
       continue;
-    } else if (match(propName, "^EXDATE$") && matchTEXTField(propDescr)) {
+    } else if (match(propName, "^EXDATE$")) { //  && matchTEXTField(propDescr)
       continue;
-    } else if (match(propName, "^RDATE$") && matchTEXTField(propDescr)) {
+    } else if (match(propName, "^RDATE$")) { //  && matchTEXTField(propDescr)
       continue;
-    } else if (match(propName, "^RRULE") && matchTEXTField(propDescr) && getPropCount("RRULE", event->properties) <= 1) {
+    } else if (match(propName, "^RRULE") && getPropCount("RRULE", event->properties) <= 1) { //  && matchTEXTField(propDescr)
       continue;
-    } else if (match(propName, "CREATED") && matchDATEField(propDescr) && getPropCount("CREATED", event->properties) <= 1) {
+    } else if (match(propName, "CREATED") && getPropCount("CREATED", event->properties) <= 1) { //  && matchDATEField(propDescr)
      continue;
-    } else if (match(propName, "LAST-MODIFIED") && matchDATEField(propDescr)) {
+   } else if (match(propName, "LAST-MODIFIED")) { // && matchDATEField(propDescr)
      continue;
-   } else if (match(propName, "SEQUENCE") && match(propDescr, "^[[:digit:]]$")) {
+   } else if (match(propName, "SEQUENCE")) { //  && match(propDescr, "^[[:digit:]]$")
      continue;
     } else {
       // printf("INV EVENT: %s %s\n", propName, propDescr);
@@ -620,20 +828,21 @@ ICalErrorCode validateEventProps(const Calendar* obj, Event* event) {
 
 ICalErrorCode validateAlarmProps(const Calendar* obj, Event* event, Alarm* alarm) {
   ListIterator alarmPropIter = createIterator(alarm->properties);
+
   Property* prop;
 
   while ((prop = nextElement(&alarmPropIter))) {
     char* propName = prop->propName;
-    char* propDescr = prop->propDescr;
-    if (match(propName, "^ATTACH$") && matchURIField(propDescr)) {
+    // char* propDescr = prop->propDescr;
+    if (match(propName, "^ATTACH$")) { // && matchURIField(propDescr)
       continue;
-    } else if (match(propName, "^REPEAT$") && match(propDescr, "^[[:digit:]]+$")) {
+    } else if (match(propName, "^REPEAT$")) { //  && match(propDescr, "^[[:digit:]]+$")
       continue;
-    } else if (match(propName, "^DURATION$") && matchDURATIONField(propDescr)) {
+    } else if (match(propName, "^DURATION$")) { //  && matchDURATIONField(propDescr)
       continue;
-    } else if (match(propName, "^DESCRIPTION$") && matchSUMMARYField(propDescr) && getPropCount("DESCRIPTION", alarm->properties) <= 1) {
+    } else if (match(propName, "^DESCRIPTION$") && getPropCount("DESCRIPTION", alarm->properties) <= 1) { //  && matchSUMMARYField(propDescr)
       continue;
-    } else if (match(propName, "^SUMMARY$") && matchTEXTField(propDescr)) {
+    } else if (match(propName, "^SUMMARY$")) { //  && matchTEXTField(propDescr)
       continue;
     } else {
       // printf("INV ALARM: %s %s\n", propName, propDescr);
@@ -650,10 +859,10 @@ ICalErrorCode validateCalProps(const Calendar* obj) {
 
   while ((prop = nextElement(&calPropIter))) {
     char* propName = prop->propName;
-    char* propDescr = prop->propDescr;
-    if (match(propName, "^CALSCALE$") && matchTEXTField(propDescr) && getPropCount("CALSCALE", obj->properties) <= 1) {
+    // char* propDescr = prop->propDescr;
+    if (match(propName, "^CALSCALE$") && getPropCount("CALSCALE", obj->properties) <= 1) { //  && matchTEXTField(propDescr)
       continue;
-    } else if (match(propName, "^METHOD$") && matchTEXTField(propDescr) && getPropCount("METHOD", obj->properties) <= 1) {
+    } else if (match(propName, "^METHOD$") && getPropCount("METHOD", obj->properties) <= 1) { //  && matchTEXTField(propDescr)
       continue;
     } else {
       // printf("INV CAL: %s %s\n", propName, propDescr);
@@ -690,6 +899,19 @@ ICalErrorCode validateCalendar(const Calendar* obj) {
     return INV_CAL; // Must have at least one event
   }
 
+  if (findElement(obj->properties, &compareTags, "PRODID")) { // If there is a prodid in the props
+    return DUP_PRODID;
+  }
+
+  if (findElement(obj->properties, &compareTags, "VERSION")) { // If there is a prodid in the props
+    return DUP_VER;
+  }
+
+  ICalErrorCode calPropsError = validateCalProps(obj);
+  if (calPropsError != OK) {
+    return calPropsError;
+  }
+
   ListIterator eventIter = createIterator(obj->events);
   Event* ev;
 
@@ -710,28 +932,12 @@ ICalErrorCode validateCalendar(const Calendar* obj) {
     ListIterator alarmIter = createIterator(ev->alarms);
     Alarm* a;
     while ((a = nextElement(&alarmIter))) {
-      // if (!match(a->action, "^(AUDIO|DISPLAY|EMAIL)$") || (strcmp(a->trigger, "") == 0)) {
-      //   return INV_ALARM;
-      // }
-      //
-      // ListIterator aPropIter = createIterator(a->properties);
-      // Property* ap;
-      //
-      // while ((ap = nextElement(&aPropIter))) {
-      //   if (strlen(ap->propName) == 0) {
-      //     return INV_ALARM;
-      //   }
-      // }
       ICalErrorCode alarmErrorCode = validateAlarmProps(obj, ev, a);
+
       if (alarmErrorCode != OK) {
         return alarmErrorCode;
       }
     }
-  }
-
-  ICalErrorCode calPropsError = validateCalProps(obj);
-  if (calPropsError != OK) {
-    return calPropsError;
   }
 
   return OK;
@@ -789,7 +995,7 @@ int matchEMAILField(char* line) {
 }
 
 int matchDURATIONField(char* line) {
-  return 1;
+
   // Second: [[:digit:]]+S
   // minute: [[:digit:]]+M([[:digit:]]+S){0,1}
   // hour: [[:digit:]]+H([[:digit:]]+M([[:digit:]]+S){0,1}){0,1}
@@ -1020,37 +1226,60 @@ void deletePropertyListFunction(void *toBeDeleted) {
 // This method never gets called but whatev
 char* printAlarmListFunction(void *toBePrinted) {
   Alarm* a = (Alarm*) toBePrinted;
-  size_t finalSize = 0;
-  char c;
-  size_t i = 0;
-  while ((c = a->action[i]) != '\0') {
-    i ++; // Calculate size of action
+  size_t lineLength = 0;
+  calculateLineLength(&lineLength, "  ALARM:\n" , NULL); // Add the length of these strings to the lineLength
+
+  if (strlen(a->action) == 0) {
+    return NULL; // Action is empty return null
   }
-  finalSize += i;
-  i = 0;
-  while ((c = a->trigger[i]) != '\0') {
-    i ++; // Calculate size of trigger
+  // Get the length of the Action line
+  calculateLineLength(&lineLength, "   ACTION:", a->action, "\n" , NULL); // Add the length of these strings to the lineLength
+
+  if (strlen(a->trigger) == 0) {
+    return NULL; // Action is empty return null
   }
-  finalSize += i;
-  finalSize += 4; // Add room for "|"
-  char* propListString = toString(a->properties); // Print the properties
-  i = 0;
-  while ((c = propListString[i]) != '\0') {
-    i ++; // Calculate size of list string
+  // Get the length of the Trigger line
+  calculateLineLength(&lineLength, "   TRIGGER:", a->trigger ,"\n" , NULL); // Add the length of these strings to the lineLength
+
+  List alarmProps = a->properties;
+  // Output the props
+  if (alarmProps.head) {
+    calculateLineLength(&lineLength, "   ALARM PROPERTIES:\n" , NULL); // Add the length of these strings to the lineLength
+
+    // Get length of each property
+    ListIterator propsIter = createIterator(alarmProps);
+    Property* p;
+
+    while ((p = nextElement(&propsIter)) != NULL) {
+      char* printedProp = printPropertyListFunction(p); // Get the string for this prop
+      calculateLineLength(&lineLength, "      ", printedProp, "\n", NULL); // Add the length of these strings to the lineLength
+      safelyFreeString(printedProp); // Free the string
+    }
   }
-  finalSize += i;
-  // Mash it all up together
-  char* string = malloc(finalSize + 1); // +1 to make room for NULL terminator
-  strcpy(string, "|");
-  strcat(string, a->action);
-  strcat(string, "|");
-  strcat(string, a->trigger);
-  strcat(string, "|");
-  strcat(string, propListString);
-  strcat(string, "|");
-  string[finalSize] = '\0'; // Set null terminator just in case strcat didnt
-  safelyFreeString(propListString); // Bye felicia
-  return string; // Return the string
+
+  lineLength ++; // Make room for null terminator
+  char* string = calloc(lineLength + 1, 1);
+
+  concatenateLine(string, "  ALARM:\n", NULL); // Alarm header
+  concatenateLine(string, "   ACTION:", a->action, "\n", NULL); // Alarm action
+  concatenateLine(string, "   TRIGGER:", a->trigger, "\n", NULL); // Alarm trigger
+
+  alarmProps = a->properties;
+  // Output the props
+  if (alarmProps.head) {
+    concatenateLine(string, "   ALARM PROPERTIES:\n", NULL); // Alarm properties header
+
+    // Get each property string
+    ListIterator propsIter = createIterator(alarmProps);
+    Property* p;
+
+    while ((p = nextElement(&propsIter)) != NULL) {
+      char* printedProp = printPropertyListFunction(p);
+      concatenateLine(string, "    ", printedProp, "\n", NULL); // Alarm properties
+      safelyFreeString(printedProp); // Free the string
+    }
+  }
+  return string;
 }
 
 // This hasnt been required yet
@@ -1141,7 +1370,7 @@ Alarm* createAlarmFromPropList(List props) {
       strcpy(ACTION, tempDescription);
 
     } else if (match(propName, "^TRIGGER$")) {
-      if (TRIGGER || !matchDURATIONField(propDescr)) {
+      if (TRIGGER) { // || !matchDURATIONField(propDescr)
         clearList(&alarmProps);
         // printf("%s\n", propDescr);
         return NULL; // Already have trigger
@@ -1246,6 +1475,7 @@ ICalErrorCode readLinesIntoList(char* fileName, List* list, int bufferSize) {
 
   // If the fileName is NULL or does not match the regex expression *.ics or cannot be opened
   if (!fileName || !match(fileName, ".+\\.ics$") || (file = fopen(fileName, "r")) == NULL) {
+
     return INV_FILE; // The file is invalid
   }
 
@@ -1411,7 +1641,7 @@ ICalErrorCode extractBetweenTags(List props, List* extracted, ICalErrorCode onFa
     safelyFreeString(line); // Bye
   }
   if (beginCount == 0 && endCount == 0) { // If we didnt parse any tags at all
-    return onFailError;
+    return OTHER_ERROR;
   }
 
   if (beginCount == 1 && endCount != beginCount) { // If there is no matching end tag
@@ -1452,18 +1682,21 @@ int fileExists(char* file) {
 }
 
 // Creates a time and puts it into the sent event
-ICalErrorCode createTime(Event* event, char* timeString) {
+ICalErrorCode createDateTime(Event* event, char* timeString) {
   if (!timeString || !event || !matchDATEField(timeString)) { // If its null or doesnt match the required regex
     return INV_CREATEDT;
   }
   char* numberDate;
   char* timeS;
-  if (match(timeString, "^(:|;)")) {
-    numberDate = extractSubstringBefore(&timeString[1], "T"); // Get substring before the T but start past the (semi)colon
+  char* temp;
+  if (match(timeString, ".*(:|;).*")) {
+    char* end = strchr(timeString, ':');
+    numberDate = extractSubstringBefore(&end[1], "T"); // Get substring before the T but start past the (semi)colon
+    temp = extractSubstringAfter(end, "T"); // Extract after the T
   } else {
     numberDate = extractSubstringBefore(timeString, "T"); // Get the substring before the T
+    temp = extractSubstringAfter(timeString, "T"); // Extract after the T
   }
-  char* temp = extractSubstringAfter(timeString, "T"); // Extract after the T
   if (match(timeString, "Z$")) { // If UTC
     timeS = extractSubstringBefore(temp, "Z"); // Get the time between the T and Z
     event->creationDateTime.UTC = true; // UTC is true
@@ -1482,6 +1715,44 @@ ICalErrorCode createTime(Event* event, char* timeString) {
 
   safelyFreeString(numberDate); // Free before returning
   safelyFreeString(timeS);
+  return OK; // You're OK but I have a girlfriend, sorry
+}
+
+// Creates a time and puts it into the sent event
+ICalErrorCode createStartTime(Event* event, char* timeString) {
+  if (!timeString || !event || !matchDATEField(timeString)) { // If its null or doesnt match the required regex
+    return INV_CREATEDT;
+  }
+  char* numberDate;
+  char* timeS;
+  char* temp;
+  if (match(timeString, ".*(:|;).*")) {
+    char* end = strchr(timeString, ':');
+    numberDate = extractSubstringBefore(&end[1], "T"); // Get substring before the T but start past the (semi)colon
+    temp = extractSubstringAfter(end, "T"); // Extract after the T
+  } else {
+    numberDate = extractSubstringBefore(timeString, "T"); // Get the substring before the T
+    temp = extractSubstringAfter(timeString, "T"); // Extract after the T
+  }
+  if (match(timeString, "Z$")) { // If UTC
+    timeS = extractSubstringBefore(temp, "Z"); // Get the time between the T and Z
+    event->startDateTime.UTC = true; // UTC is true
+    safelyFreeString(temp); // Free temp
+  } else {
+    timeS = temp; // Get the time after T
+    event->startDateTime.UTC = false;
+  }
+  if (!numberDate || !temp || !timeS) { // We dont have all of the things we need
+    safelyFreeString(numberDate); // Free before returning
+    safelyFreeString(timeS);
+    return INV_CREATEDT; // We failed :'(
+  }
+  strcpy(event->startDateTime.date, numberDate); // Copy the values
+  strcpy(event->startDateTime.time, timeS);
+
+  safelyFreeString(numberDate); // Free before returning
+  safelyFreeString(timeS);
+
   return OK; // You're OK but I have a girlfriend, sorry
 }
 
@@ -1530,7 +1801,7 @@ ICalErrorCode createEvent(List eventList, Event* event) {
   List newEventList = copyPropList(eventList);
 
   // While we still have VALARM tags
-  while (extractBetweenTags(newEventList, &alarmPropList, INV_EVENT, "VALARM") != INV_EVENT) {
+  while (extractBetweenTags(newEventList, &alarmPropList, INV_EVENT, "VALARM") != OTHER_ERROR) {
     Alarm* a = createAlarmFromPropList(alarmPropList);
 
     if (a) {
@@ -1551,12 +1822,14 @@ ICalErrorCode createEvent(List eventList, Event* event) {
 
   char* UID = NULL; // Placeholders for uid and dstamp
   char* DTSTAMP = NULL;
+  char* DTSTART = NULL;
 
   while ((prop = nextElement(&eventIterator)) != NULL) {
     char* propName = prop->propName; // make these for better readability
     char* propDescr = prop->propDescr;
     if (strcmp(propDescr, "") == 0 || strcmp(propName, "") == 0) { // If no descripting, we are in trouble
       safelyFreeString(UID); // Free strings before returning
+      safelyFreeString(DTSTART);
       safelyFreeString(DTSTAMP);
       clearList(&newEventList); // Clear list before returning
       return INV_EVENT;
@@ -1564,6 +1837,7 @@ ICalErrorCode createEvent(List eventList, Event* event) {
     if (match(propName, "^UID$")) { // If this is the UID
       if (UID != NULL || !propDescr || !strlen(propDescr)) { // If there is a problem with it
         safelyFreeString(UID); // Free strings before returning
+        safelyFreeString(DTSTART);
         safelyFreeString(DTSTAMP);
         clearList(&newEventList); // Clear list before returning
         return INV_EVENT; // UID has already been assigned or propDesc is null or empty
@@ -1580,14 +1854,33 @@ ICalErrorCode createEvent(List eventList, Event* event) {
     } else if (match(propName, "^DTSTAMP$")) {
       if (DTSTAMP != NULL || !propDescr) { // If the date is problematic
         safelyFreeString(UID); // Free before returning
+        safelyFreeString(DTSTART);
         safelyFreeString(DTSTAMP);
         clearList(&newEventList);
         return INV_EVENT; // DTSTAMP has already been assigned or propDesc is null or empty
       }
       DTSTAMP = eventList.printData(prop); // Set the DTSTAMP flag
-      ICalErrorCode e = createTime(event, propDescr);
+      ICalErrorCode e = createDateTime(event, propDescr);
       if (e != OK) {
         safelyFreeString(UID); // Free stored UID
+        safelyFreeString(DTSTART);
+        safelyFreeString(DTSTAMP); // Free stored DTSTAMP
+        clearList(&newEventList);
+        return e;
+      }
+    } else if (match(propName, "^DTSTART$")) {
+      if (DTSTART != NULL || !propDescr) { // If the date is problematic
+        safelyFreeString(UID); // Free before returning
+        safelyFreeString(DTSTART);
+        safelyFreeString(DTSTAMP);
+        clearList(&newEventList);
+        return INV_EVENT; // DTSTAMP has already been assigned or propDesc is null or empty
+      }
+      DTSTART = eventList.printData(prop); // Set the DTSTAMP flag
+      ICalErrorCode e = createStartTime(event, propDescr);
+      if (e != OK) {
+        safelyFreeString(UID); // Free stored UID
+        safelyFreeString(DTSTART);
         safelyFreeString(DTSTAMP); // Free stored DTSTAMP
         clearList(&newEventList);
         return e;
@@ -1600,6 +1893,13 @@ ICalErrorCode createEvent(List eventList, Event* event) {
     safelyFreeString(DTSTAMP); // Free stored DTSTAMP
     clearList(&newEventList);
     return INV_EVENT;
+  }
+
+  if (!DTSTART) {
+    event->startDateTime = event->creationDateTime;
+  } else {
+    deleteProperty(&newEventList, DTSTART); // Delete UID from event properties
+    safelyFreeString(DTSTART);
   }
 
   deleteProperty(&newEventList, UID); // Delete UID from event properties
